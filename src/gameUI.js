@@ -108,7 +108,6 @@ export class GameUI {
     app.innerHTML = this.getHTML();
     this.renderBoard();
     this.renderScoreBoard();
-    this.renderResourcePanel();
     this.renderPlayersStatus();
     this.renderTechnologyCards();
     this.setupEventListeners(); // 이벤트 리스너 다시 바인딩
@@ -131,54 +130,50 @@ export class GameUI {
         </div>
 
         <div class="game-main">
-          <div class="left-panel">
-            <div class="score-board">
-              <h2>점수</h2>
-              <div class="score-row">
-                <div class="score-label">기술 점수</div>
-                <div class="score-value">${playerState.techScore}</div>
-                ${!this.gameState.turnActionTaken ? `
-                  <button id="increase-tech" class="score-btn">+1</button>
-                ` : '<span class="disabled-text">완료</span>'}
+          <div class="top-section">
+            <div class="left-panel">
+              <div class="score-board">
+                <h2>점수</h2>
+                <div class="score-row">
+                  <div class="score-label">기술 점수</div>
+                  <div class="score-value">${playerState.techScore}</div>
+                  ${!this.gameState.turnActionTaken ? `
+                    <button id="increase-tech" class="score-btn">+1</button>
+                  ` : '<span class="disabled-text">완료</span>'}
+                </div>
+                <div class="score-row">
+                  <div class="score-label">과학 점수</div>
+                  <div class="score-value">${playerState.scienceScore}</div>
+                  ${!this.gameState.turnActionTaken ? `
+                    <button id="increase-science" class="score-btn">+1</button>
+                  ` : '<span class="disabled-text">완료</span>'}
+                </div>
               </div>
-              <div class="score-row">
-                <div class="score-label">과학 점수</div>
-                <div class="score-value">${playerState.scienceScore}</div>
+              <div class="action-panel">
                 ${!this.gameState.turnActionTaken ? `
-                  <button id="increase-science" class="score-btn">+1</button>
-                ` : '<span class="disabled-text">완료</span>'}
+                  <button id="end-turn" class="action-btn">턴 종료 (행동 안함)</button>
+                ` : `
+                  <div class="turn-message">행동 완료! 다음 플레이어 차례입니다.</div>
+                `}
               </div>
             </div>
 
-            <div class="resource-panel">
-              <h2>자원</h2>
-              <div class="resources-grid"></div>
+            <div class="board-container">
+              <div id="hex-board" class="hex-board"></div>
             </div>
 
-            <div class="action-panel">
-              ${!this.gameState.turnActionTaken ? `
-                <button id="end-turn" class="action-btn">턴 종료 (행동 안함)</button>
-              ` : `
-                <div class="turn-message">행동 완료! 다음 플레이어 차례입니다.</div>
-              `}
+            <div class="cards-panel">
+              <div class="technology-cards">
+                <h2>기술 발달 카드</h2>
+                <div class="cards-grid"></div>
+              </div>
             </div>
           </div>
 
-          <div class="board-container">
-            <div id="hex-board" class="hex-board"></div>
-          </div>
-
-          <div class="right-panel">
+          <div class="bottom-section">
             <div class="players-status">
               <h2>플레이어 현황</h2>
               <div class="players-list"></div>
-            </div>
-          </div>
-
-          <div class="cards-panel">
-            <div class="technology-cards">
-              <h2>기술 발달 카드</h2>
-              <div class="cards-grid"></div>
             </div>
           </div>
         </div>

@@ -72,10 +72,22 @@ body {
 }
 
 .game-main {
-  display: grid;
-  grid-template-columns: 300px 1fr 350px 400px;
+  display: flex;
+  flex-direction: column;
   gap: 20px;
-  align-items: start;
+  height: calc(100vh - 150px);
+}
+
+.top-section {
+  display: grid;
+  grid-template-columns: 300px 1fr 400px;
+  gap: 20px;
+  flex: 1;
+  min-height: 0;
+}
+
+.bottom-section {
+  flex: 0 0 auto;
 }
 
 .left-panel {
@@ -86,7 +98,6 @@ body {
   display: flex;
   flex-direction: column;
   gap: 20px;
-  max-height: calc(100vh - 100px);
   overflow-y: auto;
 }
 
@@ -107,13 +118,15 @@ body {
   border-radius: 10px;
   padding: 20px;
   box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-  max-height: calc(100vh - 100px);
   overflow-y: auto;
+  display: flex;
+  flex-direction: column;
 }
 
 .board-container {
   flex: 1;
   min-width: 0;
+  min-height: 0;
   background: linear-gradient(145deg, #f0f4f8 0%, #e8edf3 100%);
   border-radius: 20px;
   padding: 30px;
@@ -122,6 +135,9 @@ body {
     inset 0 1px 0 rgba(255,255,255,0.8);
   overflow: auto;
   border: 2px solid rgba(255,255,255,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .score-board {
@@ -386,8 +402,15 @@ body {
 }
 
 
+.bottom-section {
+  background: white;
+  border-radius: 10px;
+  padding: 20px;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
 .players-status {
-  margin-bottom: 20px;
+  margin-bottom: 0;
 }
 
 .players-status h2 {
@@ -398,9 +421,9 @@ body {
 }
 
 .players-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 15px;
 }
 
 .player-card {
@@ -754,12 +777,16 @@ body {
 }
 
 @media (max-width: 1400px) {
-  .game-main {
+  .top-section {
     grid-template-columns: 1fr;
-    grid-template-rows: auto auto auto auto;
+    grid-template-rows: auto auto auto;
   }
   
   .cards-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .players-list {
     grid-template-columns: repeat(2, 1fr);
   }
 }
