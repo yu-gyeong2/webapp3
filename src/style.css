@@ -74,16 +74,18 @@ body {
 .game-main {
   display: flex;
   flex-direction: column;
-  gap: 20px;
-  height: calc(100vh - 150px);
+  gap: 15px;
+  min-height: calc(100vh - 100px);
+  overflow: visible;
 }
 
 .top-section {
   display: grid;
-  grid-template-columns: 300px 1fr 400px;
-  gap: 20px;
+  grid-template-columns: 400px auto;
+  gap: 15px;
   flex: 1;
   min-height: 0;
+  overflow: visible;
 }
 
 .bottom-section {
@@ -93,12 +95,13 @@ body {
 .left-panel {
   background: white;
   border-radius: 10px;
-  padding: 20px;
+  padding: 15px;
   box-shadow: 0 4px 6px rgba(0,0,0,0.1);
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 15px;
   overflow-y: auto;
+  align-self: flex-start;
 }
 
 .right-panel {
@@ -116,11 +119,12 @@ body {
 .cards-panel {
   background: white;
   border-radius: 10px;
-  padding: 20px;
+  padding: 12px;
   box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-  overflow-y: auto;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
+  height: 100%;
 }
 
 .board-container {
@@ -129,19 +133,22 @@ body {
   min-height: 0;
   background: linear-gradient(145deg, #f0f4f8 0%, #e8edf3 100%);
   border-radius: 20px;
-  padding: 30px;
+  padding: 20px;
   box-shadow: 
     0 10px 30px rgba(0,0,0,0.2),
     inset 0 1px 0 rgba(255,255,255,0.8);
-  overflow: auto;
+  overflow: visible;
   border: 2px solid rgba(255,255,255,0.5);
   display: flex;
-  align-items: center;
-  justify-content: center;
+  align-items: flex-start;
+  justify-content: flex-start;
+  width: fit-content;
+  height: fit-content;
 }
 
 .score-board {
-  margin-bottom: 20px;
+  margin-bottom: 0;
+  flex: 0 0 auto;
 }
 
 .score-board h2 {
@@ -224,7 +231,8 @@ body {
 }
 
 .action-panel {
-  margin-top: 20px;
+  margin-top: auto;
+  flex: 0 0 auto;
 }
 
 .action-btn {
@@ -534,34 +542,42 @@ body {
 }
 
 .technology-cards {
-  margin-top: 0;
+  margin-top: 15px;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
 }
 
 .technology-cards h2 {
   margin-top: 0;
-  font-size: 1.3em;
+  font-size: 1.1em;
   border-bottom: 2px solid #667eea;
-  padding-bottom: 10px;
+  padding-bottom: 8px;
+  flex: 0 0 auto;
 }
 
 .cards-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 10px;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
   overflow-y: auto;
+  flex: 1;
+  min-height: 0;
 }
 
 .tech-card {
   background: white;
   border: 2px solid #ddd;
   border-radius: 8px;
-  padding: 10px;
+  padding: 6px;
   cursor: pointer;
   transition: all 0.3s;
-  min-height: 120px;
+  min-height: 90px;
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 3px;
+  font-size: 0.8em;
 }
 
 .tech-card:hover:not(.disabled):not(.acquired) {
@@ -584,25 +600,25 @@ body {
 
 .card-header {
   font-weight: bold;
-  font-size: 0.9em;
+  font-size: 0.85em;
   color: #333;
   border-bottom: 1px solid #eee;
-  padding-bottom: 5px;
+  padding-bottom: 3px;
 }
 
 .card-condition {
-  font-size: 0.75em;
+  font-size: 0.7em;
   color: #666;
 }
 
 .card-resources {
-  font-size: 0.75em;
+  font-size: 0.7em;
   color: #764ba2;
   font-weight: bold;
 }
 
 .card-effect {
-  font-size: 0.8em;
+  font-size: 0.75em;
   color: #28a745;
   font-weight: bold;
   margin-top: auto;

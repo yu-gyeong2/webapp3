@@ -156,17 +156,14 @@ export class GameUI {
                   <div class="turn-message">행동 완료! 다음 플레이어 차례입니다.</div>
                 `}
               </div>
-            </div>
-
-            <div class="board-container">
-              <div id="hex-board" class="hex-board"></div>
-            </div>
-
-            <div class="cards-panel">
               <div class="technology-cards">
                 <h2>기술 발달 카드</h2>
                 <div class="cards-grid"></div>
               </div>
+            </div>
+
+            <div class="board-container">
+              <div id="hex-board" class="hex-board"></div>
             </div>
           </div>
 
@@ -227,7 +224,8 @@ export class GameUI {
     const boardEl = document.getElementById('hex-board');
     boardEl.innerHTML = '';
 
-    const hexSize = 30;
+    // 육각형 크기를 이전 사이즈로 복원
+    const hexSize = 40; // 이전 사이즈로 복원
     const hexWidth = hexSize * 2;
     const hexHeight = Math.sqrt(3) * hexSize;
 
@@ -298,8 +296,26 @@ export class GameUI {
       });
     });
 
-    boardEl.style.width = `${this.board.width * hexWidth * 0.75 + hexWidth}px`;
-    boardEl.style.height = `${this.board.height * hexHeight + hexHeight}px`;
+    const totalWidth = this.board.width * hexWidth * 0.75 + hexWidth;
+    const totalHeight = this.board.height * hexHeight + hexHeight;
+    
+    boardEl.style.width = `${totalWidth}px`;
+    boardEl.style.height = `${totalHeight}px`;
+    boardEl.style.transform = 'none'; // 스케일링 제거, 원래 크기로 표시
+    
+    // 보드 컨테이너 크기를 보드 크기에 맞게 조정
+    const container = boardEl.parentElement;
+    if (container) {
+      const containerHeight = totalHeight + 40; // 패딩 20px * 2
+      container.style.width = `${totalWidth + 40}px`; // 패딩 20px * 2
+      container.style.height = `${containerHeight}px`; // 패딩 20px * 2
+      
+      // 왼쪽 패널 높이도 보드 컨테이너와 동일하게 설정
+      const leftPanel = document.querySelector('.left-panel');
+      if (leftPanel) {
+        leftPanel.style.height = `${containerHeight}px`;
+      }
+    }
   }
 
   renderScoreBoard() {
