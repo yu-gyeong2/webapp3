@@ -20,12 +20,7 @@ export function canAcquireCard(card, gameState) {
     }
   }
 
-  // 필요 자원 체크
-  for (const [resource, amount] of Object.entries(card.resources)) {
-    if (playerState.resources[resource] < amount) {
-      return false;
-    }
-  }
+  // 자원 체크는 제거 - 자원은 소모되지 않으므로 조건에서 제외
 
   // 이미 획득한 카드인지 체크
   if (playerState.acquiredCards.includes(card.id)) {
@@ -43,16 +38,12 @@ export function acquireCard(card, gameState) {
   const currentPlayerId = gameState.currentPlayer;
   const playerState = gameState.playerStates[currentPlayerId];
   
-  // 자원 소모
-  const newResources = { ...playerState.resources };
-  for (const [resource, amount] of Object.entries(card.resources)) {
-    newResources[resource] -= amount;
-  }
+  // 자원은 소모하지 않음 - 자원 유지
 
   // 카드 효과 적용
   const updatedPlayerState = {
     ...playerState,
-    resources: newResources,
+    resources: { ...playerState.resources }, // 자원 유지
     acquiredCards: [...playerState.acquiredCards, card.id]
   };
 
