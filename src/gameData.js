@@ -60,7 +60,7 @@ export const TECHNOLOGY_CARDS = [
     condition: { scienceScore: 3 },
     prerequisites: [],
     resources: { [RESOURCE_TYPES.COPPER]: 1 },
-    effect: { resourceExchange: 1 }
+    effect: {}
   },
   {
     id: 'automobile',
@@ -76,7 +76,7 @@ export const TECHNOLOGY_CARDS = [
     condition: { techScore: 5, scienceScore: 2 },
     prerequisites: [],
     resources: { [RESOURCE_TYPES.URANIUM]: 1 },
-    effect: { resourcePriority: true }
+    effect: {}
   },
   // Row 3
   {
@@ -93,7 +93,7 @@ export const TECHNOLOGY_CARDS = [
     condition: { techScore: 6 },
     prerequisites: ['telephone'],
     resources: {},
-    effect: { resourceExchange: 1 }
+    effect: {}
   },
   {
     id: 'robot-tech',

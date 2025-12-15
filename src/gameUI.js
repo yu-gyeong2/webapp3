@@ -22,6 +22,10 @@ export class GameUI {
     this.showTurnPopup = true; // 턴 팝업 표시 여부
     this.popupTitle = null; // 팝업 제목 (null이면 기본 제목 사용)
     this.popupButtonText = null; // 팝업 버튼 텍스트 (null이면 기본 텍스트 사용)
+    this.showResourceSelectPopup = false; // 자원 선택 팝업 표시 여부
+    this.selectedResourceForDouble = null; // 2배로 만들 자원
+    this.showTeleportPopup = false; // 순간이동 팝업 표시 여부
+    this.teleportMode = false; // 순간이동 모드 활성화 여부
     this.init();
   }
 
@@ -114,6 +118,12 @@ export class GameUI {
     this.setupBoardEventListeners();
     this.setupCardEventListeners();
     this.setupTurnPopupListener(); // 턴 팝업 리스너
+    if (this.showResourceSelectPopup) {
+      this.setupResourceSelectListeners(); // 자원 선택 팝업 리스너
+    }
+    if (this.showTeleportPopup) {
+      this.setupTeleportListeners(); // 순간이동 팝업 리스너
+    }
   }
 
   getHTML() {
@@ -198,7 +208,7 @@ export class GameUI {
                     ${Object.entries(RESOURCE_TYPES).map(([key, name]) => `
                       <div class="popup-resource-item">
                         <span>${name}</span>
-                        <span class="popup-resource-count">${playerState.resources[name]}</span>
+                        <span class="popup-resource-count">${playerState.resources[key] || 0}</span>
                       </div>
                     `).join('')}
                   </div>
@@ -208,6 +218,43 @@ export class GameUI {
             </div>
           </div>
         ` : ''}
+        
+        ${this.showResourceSelectPopup && !this.gameState.gameOver ? `
+          <div class="turn-popup-modal">
+            <div class="turn-popup-content">
+              <h2>자원 선택</h2>
+              <p>2배로 만들 자원을 선택하세요:</p>
+              <div class="popup-resources">
+                <div class="popup-resources-grid">
+                  ${Object.entries(RESOURCE_TYPES).map(([key, name]) => {
+                    const count = playerState.resources[key] || 0;
+                    if (count > 0) {
+                      return `
+                        <div class="popup-resource-item resource-select-item ${this.selectedResourceForDouble === key ? 'selected' : ''}" data-resource="${key}">
+                          <span class="popup-resource-name">${name}</span>
+                          <span class="popup-resource-count">${count}개</span>
+                        </div>
+                      `;
+                    }
+                    return '';
+                  }).filter(Boolean).join('')}
+                </div>
+              </div>
+              <button id="confirm-resource-double" class="popup-close-btn" ${this.selectedResourceForDouble ? '' : 'disabled'}>확인</button>
+            </div>
+          </div>
+        ` : ''}
+        
+        ${this.showTeleportPopup && !this.gameState.gameOver ? `
+          <div class="turn-popup-modal">
+            <div class="turn-popup-content">
+              <h2>순간이동</h2>
+              <p>이동을 원하는 곳을 선택하세요:</p>
+              <p style="font-size: 0.9em; color: #666; margin-top: 10px;">보드에서 원하는 위치를 클릭하세요</p>
+            </div>
+          </div>
+        ` : ''}
+        
         ${this.gameState.gameOver ? `
           <div class="game-over-modal">
             <div class="modal-content">
@@ -276,6 +323,11 @@ export class GameUI {
 
         // 도달 가능한 타일 표시
         if (this.reachableTiles.some(t => t.x === x && t.y === y)) {
+          hex.classList.add('reachable');
+        }
+        
+        // 순간이동 모드일 때 모든 타일을 클릭 가능하게 표시
+        if (this.teleportMode && this.showTeleportPopup) {
           hex.classList.add('reachable');
         }
 
@@ -406,12 +458,18 @@ export class GameUI {
         cardEl.classList.add('disabled');
       }
 
+      // 선행기술 이름 가져오기
+      const prerequisiteNames = card.prerequisites.map(prereqId => {
+        const prereqCard = TECHNOLOGY_CARDS.find(c => c.id === prereqId);
+        return prereqCard ? prereqCard.name : prereqId;
+      });
+
       cardEl.innerHTML = `
         <div class="card-header">${card.name}</div>
         <div class="card-condition">
           ${card.condition.techScore ? `기술 ${card.condition.techScore}점` : ''}
           ${card.condition.scienceScore ? `과학 ${card.condition.scienceScore}점` : ''}
-          ${card.prerequisites.length > 0 ? `선행: ${card.prerequisites.length}개` : ''}
+          ${prerequisiteNames.length > 0 ? `<div class="card-prerequisites">선행기술: ${prerequisiteNames.join(', ')}</div>` : ''}
         </div>
         <div class="card-resources">
           ${Object.entries(card.resources).map(([res, amt]) => `${res} ${amt}개`).join(', ') || '자원 없음'}
@@ -432,9 +490,7 @@ export class GameUI {
     if (effect.scienceScore) return `과학 +${effect.scienceScore}`;
     if (effect.movementRange) return `이동 ${effect.movementRange}칸`;
     if (effect.doubleResource) return `자원 2배 (${effect.doubleResource}회)`;
-    if (effect.resourceExchange) return `자원 교환 (${effect.resourceExchange}회)`;
     if (effect.teleport) return `순간이동 (${effect.teleport}회)`;
-    if (effect.resourcePriority) return '자원 우선권';
     return '';
   }
 
@@ -444,6 +500,24 @@ export class GameUI {
       tile.addEventListener('click', (e) => {
         const x = parseInt(tile.dataset.x);
         const y = parseInt(tile.dataset.y);
+
+        // 순간이동 모드일 때
+        if (this.teleportMode && this.showTeleportPopup) {
+          const currentPlayerId = this.gameState.currentPlayer;
+          const playerPiece = this.gameState.pieces.find(p => p.playerId === currentPlayerId);
+          
+          if (playerPiece) {
+            const pieceIndex = this.gameState.pieces.indexOf(playerPiece);
+            // 순간이동: 선택한 위치로 이동
+            this.gameState = movePiece(pieceIndex, { x, y }, this.gameState);
+            
+            // 순간이동 완료
+            this.showTeleportPopup = false;
+            this.teleportMode = false;
+            this.render();
+          }
+          return;
+        }
 
         // 말 선택 (행동을 하지 않았을 때만)
         if (!this.gameState.turnActionTaken) {
@@ -536,13 +610,84 @@ export class GameUI {
           const result = acquireCard(cardData, this.gameState);
           if (result.success) {
             this.gameState = result.newState;
-            this.render();
+            
+            // 자원 2배 효과가 있으면 팝업 표시
+            if (cardData.effect.doubleResource) {
+              this.showResourceSelectPopup = true;
+              this.selectedResourceForDouble = null;
+              this.render();
+              this.setupResourceSelectListeners();
+            } 
+            // 순간이동 효과가 있으면 팝업 표시
+            else if (cardData.effect.teleport) {
+              this.showTeleportPopup = true;
+              this.teleportMode = true;
+              this.render();
+              this.setupTeleportListeners();
+            } else {
+              this.render();
+            }
           } else {
             alert(result.message);
           }
         }
       });
     });
+  }
+
+  setupResourceSelectListeners() {
+    // 자원 선택
+    const resourceItems = document.querySelectorAll('.resource-select-item');
+    resourceItems.forEach(item => {
+      item.addEventListener('click', () => {
+        const resourceKey = item.dataset.resource;
+        this.selectedResourceForDouble = resourceKey;
+        // 선택 상태 업데이트
+        resourceItems.forEach(i => i.classList.remove('selected'));
+        item.classList.add('selected');
+        // 확인 버튼 활성화
+        const confirmBtn = document.getElementById('confirm-resource-double');
+        if (confirmBtn) {
+          confirmBtn.disabled = false;
+        }
+      });
+    });
+
+    // 확인 버튼
+    const confirmBtn = document.getElementById('confirm-resource-double');
+    if (confirmBtn) {
+      confirmBtn.addEventListener('click', () => {
+        if (this.selectedResourceForDouble) {
+          // 선택한 자원을 2배로 만들기
+          const currentPlayerId = this.gameState.currentPlayer;
+          const playerState = this.gameState.playerStates[currentPlayerId];
+          const currentCount = playerState.resources[this.selectedResourceForDouble] || 0;
+          
+          const newPlayerStates = [...this.gameState.playerStates];
+          newPlayerStates[currentPlayerId] = {
+            ...playerState,
+            resources: {
+              ...playerState.resources,
+              [this.selectedResourceForDouble]: currentCount * 2
+            }
+          };
+
+          this.gameState = {
+            ...this.gameState,
+            playerStates: newPlayerStates
+          };
+
+          this.showResourceSelectPopup = false;
+          this.selectedResourceForDouble = null;
+          this.render();
+        }
+      });
+    }
+  }
+
+  setupTeleportListeners() {
+    // 순간이동 팝업은 보드 클릭으로 처리되므로 여기서는 특별한 처리가 필요 없음
+    // 보드의 모든 타일이 클릭 가능하도록 setupBoardEventListeners에서 처리됨
   }
 }
 
