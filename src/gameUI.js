@@ -14,7 +14,7 @@ import {
 
 export class GameUI {
   constructor() {
-    this.gameState = createInitialGameState();
+    this.gameState = null;
     this.board = new HexBoard();
     this.selectedPiece = null;
     this.selectedTile = null;
@@ -26,12 +26,20 @@ export class GameUI {
     this.selectedResourceForDouble = null; // 2배로 만들 자원
     this.showTeleportPopup = false; // 순간이동 팝업 표시 여부
     this.teleportMode = false; // 순간이동 모드 활성화 여부
+    this.gamePhase = 'nameInput'; // 'nameInput', 'tutorial', 'game'
+    this.playerNames = ['', '', '', ''];
     this.init();
   }
 
   init() {
     this.render();
-    this.setupEventListeners();
+    if (this.gamePhase === 'nameInput') {
+      this.setupNameInputListeners();
+    } else if (this.gamePhase === 'tutorial') {
+      this.setupTutorialListeners();
+    } else {
+      this.setupEventListeners();
+    }
   }
 
   setupEventListeners() {
@@ -110,26 +118,95 @@ export class GameUI {
   render() {
     const app = document.getElementById('app');
     app.innerHTML = this.getHTML();
-    this.renderBoard();
-    this.renderScoreBoard();
-    this.renderPlayersStatus();
-    this.renderTechnologyCards();
-    this.setupEventListeners(); // 이벤트 리스너 다시 바인딩
-    this.setupBoardEventListeners();
-    this.setupCardEventListeners();
-    this.setupTurnPopupListener(); // 턴 팝업 리스너
-    if (this.showResourceSelectPopup) {
-      this.setupResourceSelectListeners(); // 자원 선택 팝업 리스너
-    }
-    if (this.showTeleportPopup) {
-      this.setupTeleportListeners(); // 순간이동 팝업 리스너
+    
+    // 게임 화면일 때만 보드 렌더링
+    if (this.gamePhase === 'game') {
+      this.renderBoard();
+      this.renderScoreBoard();
+      this.renderPlayersStatus();
+      this.renderTechnologyCards();
+      this.setupEventListeners(); // 이벤트 리스너 다시 바인딩
+      this.setupBoardEventListeners();
+      this.setupCardEventListeners();
+      this.setupTurnPopupListener(); // 턴 팝업 리스너
+      if (this.showResourceSelectPopup) {
+        this.setupResourceSelectListeners(); // 자원 선택 팝업 리스너
+      }
+      if (this.showTeleportPopup) {
+        this.setupTeleportListeners(); // 순간이동 팝업 리스너
+      }
+    } else if (this.gamePhase === 'nameInput') {
+      this.setupNameInputListeners();
+    } else if (this.gamePhase === 'tutorial') {
+      this.setupTutorialListeners();
     }
   }
 
   getHTML() {
-    const currentPlayer = this.gameState.players[this.gameState.currentPlayer];
-    const playerState = getCurrentPlayerState(this.gameState);
-    return `
+    // 이름 입력 화면
+    if (this.gamePhase === 'nameInput') {
+      return `
+        <div class="game-container">
+          <div class="start-screen">
+            <h1>기술 발달 게임</h1>
+            <div class="name-input-section">
+              <h2>플레이어 이름 입력</h2>
+              <div class="name-inputs">
+                ${[0, 1, 2, 3].map(i => `
+                  <div class="name-input-group">
+                    <label>플레이어 ${i + 1}:</label>
+                    <input type="text" id="player-name-${i}" class="name-input" placeholder="이름을 입력하세요" value="${this.playerNames[i]}" maxlength="10">
+                  </div>
+                `).join('')}
+              </div>
+              <button id="start-game-btn" class="start-btn">게임 시작</button>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+    
+    // 튜토리얼 화면
+    if (this.gamePhase === 'tutorial') {
+      return `
+        <div class="game-container">
+          <div class="tutorial-screen">
+            <h1>게임 튜토리얼</h1>
+            <div class="tutorial-content">
+              <div class="tutorial-section">
+                <h2>게임 목표</h2>
+                <p>기술 발달 카드를 획득하여 "우주여행시대도래" 카드를 획득하면 승리합니다!</p>
+              </div>
+              <div class="tutorial-section">
+                <h2>게임 방법</h2>
+                <ul>
+                  <li>각 플레이어는 한 턴에 하나의 행동만 할 수 있습니다.</li>
+                  <li>행동 종류: 기술 점수 +1, 과학 점수 +1, 말 이동하여 자원 획득</li>
+                  <li>기술 발달 카드를 획득하려면 조건(기술/과학 점수, 선행기술, 자원)을 만족해야 합니다.</li>
+                  <li>자원은 카드 획득 시 소모되지 않습니다.</li>
+                  <li>기술 점수와 과학 점수는 계속 누적됩니다.</li>
+                </ul>
+              </div>
+              <div class="tutorial-section">
+                <h2>특수 효과</h2>
+                <ul>
+                  <li>컨베이어벨트: 자원 하나를 2배로 만들 수 있습니다.</li>
+                  <li>메타버스: 순간이동으로 원하는 위치로 이동할 수 있습니다.</li>
+                  <li>이동 범위 증가 카드: 이동 가능한 칸 수가 증가합니다.</li>
+                </ul>
+              </div>
+              <button id="start-playing-btn" class="start-btn">확인</button>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+    
+    // 게임 화면
+    if (this.gamePhase === 'game' && this.gameState) {
+      const currentPlayer = this.gameState.players[this.gameState.currentPlayer];
+      const playerState = getCurrentPlayerState(this.gameState);
+      return `
       <div class="game-container">
         <div class="game-header">
           <h1>기술 발달 게임</h1>
@@ -265,6 +342,10 @@ export class GameUI {
         ` : ''}
       </div>
     `;
+    }
+    
+    // 기본값 (발생하지 않아야 함)
+    return '';
   }
 
   renderBoard() {
@@ -688,6 +769,74 @@ export class GameUI {
   setupTeleportListeners() {
     // 순간이동 팝업은 보드 클릭으로 처리되므로 여기서는 특별한 처리가 필요 없음
     // 보드의 모든 타일이 클릭 가능하도록 setupBoardEventListeners에서 처리됨
+  }
+
+  setupNameInputListeners() {
+    const startBtn = document.getElementById('start-game-btn');
+    if (startBtn) {
+      startBtn.addEventListener('click', () => {
+        // 이름 입력 확인
+        const names = [];
+        let allFilled = true;
+        for (let i = 0; i < 4; i++) {
+          const input = document.getElementById(`player-name-${i}`);
+          const name = input ? input.value.trim() : '';
+          if (!name) {
+            allFilled = false;
+            break;
+          }
+          names.push(name || `플레이어 ${i + 1}`);
+        }
+        
+        if (!allFilled) {
+          alert('모든 플레이어의 이름을 입력해주세요.');
+          return;
+        }
+        
+        // 이름 저장
+        this.playerNames = names;
+        
+        // 튜토리얼 화면으로 이동
+        this.gamePhase = 'tutorial';
+        this.render();
+      });
+    }
+    
+    // Enter 키로 다음 입력으로 이동
+    for (let i = 0; i < 4; i++) {
+      const input = document.getElementById(`player-name-${i}`);
+      if (input) {
+        input.addEventListener('keypress', (e) => {
+          if (e.key === 'Enter') {
+            if (i < 3) {
+              const nextInput = document.getElementById(`player-name-${i + 1}`);
+              if (nextInput) nextInput.focus();
+            } else {
+              startBtn?.click();
+            }
+          }
+        });
+      }
+    }
+  }
+
+  setupTutorialListeners() {
+    const startBtn = document.getElementById('start-playing-btn');
+    if (startBtn) {
+      startBtn.addEventListener('click', () => {
+        // 게임 상태 초기화 (이름 적용)
+        this.gameState = createInitialGameState();
+        // 플레이어 이름 적용
+        this.gameState.players = this.gameState.players.map((player, index) => ({
+          ...player,
+          name: this.playerNames[index]
+        }));
+        
+        // 게임 화면으로 이동
+        this.gamePhase = 'game';
+        this.render();
+      });
+    }
   }
 }
 
