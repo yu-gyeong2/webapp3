@@ -948,6 +948,9 @@ body {
   border-radius: 10px;
   text-align: center;
   box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+  max-width: 600px;
+  max-height: 80vh;
+  overflow-y: auto;
 }
 
 .modal-content h2 {
@@ -959,6 +962,69 @@ body {
 .modal-content p {
   font-size: 1.5em;
   color: #333;
+  margin-bottom: 20px;
+}
+
+.game-result-summary {
+  margin: 20px 0;
+  text-align: left;
+}
+
+.game-result-summary h3 {
+  color: #1e3c72;
+  margin-bottom: 15px;
+  text-align: center;
+  font-size: 1.3em;
+}
+
+.result-players {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.result-player {
+  padding: 15px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border-left: 4px solid #667eea;
+}
+
+.result-player strong {
+  color: #1e3c72;
+  font-size: 1.1em;
+  display: block;
+  margin-bottom: 8px;
+}
+
+.result-player div {
+  margin: 5px 0;
+  color: #555;
+  font-size: 0.95em;
+}
+
+.pdf-download-btn {
+  width: 100%;
+  padding: 15px;
+  background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 1.2em;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.3s;
+  margin-top: 20px;
+  box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
+}
+
+.pdf-download-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(40, 167, 69, 0.4);
+}
+
+.pdf-download-btn:active {
+  transform: translateY(0);
 }
 
 @media (max-width: 1800px) {

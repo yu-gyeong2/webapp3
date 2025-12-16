@@ -135,6 +135,9 @@ export class GameUI {
       if (this.showTeleportPopup) {
         this.setupTeleportListeners(); // 순간이동 팝업 리스너
       }
+      if (this.gameState.gameOver) {
+        this.setupPDFDownloadListener(); // PDF 다운로드 리스너
+      }
     } else if (this.gamePhase === 'nameInput') {
       this.setupNameInputListeners();
     } else if (this.gamePhase === 'tutorial') {
@@ -337,6 +340,23 @@ export class GameUI {
             <div class="modal-content">
               <h2>게임 종료!</h2>
               <p>${currentPlayer.name} 승리!</p>
+              <div class="game-result-summary">
+                <h3>게임 결과</h3>
+                <div class="result-players">
+                  ${this.gameState.players.map((player, index) => {
+                    const playerState = this.gameState.playerStates[index];
+                    return `
+                      <div class="result-player">
+                        <strong>${player.name}</strong>
+                        <div>기술 점수: ${playerState.techScore}</div>
+                        <div>과학 점수: ${playerState.scienceScore}</div>
+                        <div>획득 카드: ${playerState.acquiredCards.length}개</div>
+                      </div>
+                    `;
+                  }).join('')}
+                </div>
+              </div>
+              <button id="download-pdf-btn" class="pdf-download-btn">PDF로 저장하기</button>
             </div>
           </div>
         ` : ''}
@@ -837,6 +857,104 @@ export class GameUI {
         this.render();
       });
     }
+  }
+
+  setupPDFDownloadListener() {
+    const pdfBtn = document.getElementById('download-pdf-btn');
+    if (pdfBtn) {
+      pdfBtn.addEventListener('click', () => {
+        this.generatePDF();
+      });
+    }
+  }
+
+  generatePDF() {
+    // jsPDF가 전역 객체로 로드됨
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    
+    const winner = this.gameState.players[this.gameState.winner];
+    const currentDate = new Date().toLocaleDateString('ko-KR');
+    
+    // 제목
+    doc.setFontSize(20);
+    doc.text('기술 발달 게임 결과', 105, 20, { align: 'center' });
+    
+    // 날짜
+    doc.setFontSize(12);
+    doc.text(`게임 날짜: ${currentDate}`, 105, 30, { align: 'center' });
+    
+    // 승리자
+    doc.setFontSize(16);
+    doc.text(`승리자: ${winner.name}`, 105, 45, { align: 'center' });
+    
+    // 플레이어별 결과
+    let yPos = 60;
+    doc.setFontSize(14);
+    doc.text('플레이어별 결과', 105, yPos, { align: 'center' });
+    yPos += 10;
+    
+    this.gameState.players.forEach((player, index) => {
+      const playerState = this.gameState.playerStates[index];
+      const isWinner = index === this.gameState.winner;
+      
+      yPos += 10;
+      if (yPos > 270) {
+        doc.addPage();
+        yPos = 20;
+      }
+      
+      // 플레이어 이름 (승리자는 굵게)
+      doc.setFontSize(12);
+      if (isWinner) {
+        doc.setFont(undefined, 'bold');
+      }
+      doc.text(`${player.name}${isWinner ? ' (승리!)' : ''}`, 20, yPos);
+      doc.setFont(undefined, 'normal');
+      
+      yPos += 7;
+      doc.setFontSize(10);
+      doc.text(`  기술 점수: ${playerState.techScore}`, 25, yPos);
+      yPos += 6;
+      doc.text(`  과학 점수: ${playerState.scienceScore}`, 25, yPos);
+      yPos += 6;
+      doc.text(`  획득 카드 수: ${playerState.acquiredCards.length}개`, 25, yPos);
+      
+      // 획득한 카드 목록
+      if (playerState.acquiredCards.length > 0) {
+        yPos += 6;
+        doc.text(`  획득 카드:`, 25, yPos);
+        yPos += 6;
+        playerState.acquiredCards.forEach(cardId => {
+          const card = TECHNOLOGY_CARDS.find(c => c.id === cardId);
+          if (card) {
+            if (yPos > 270) {
+              doc.addPage();
+              yPos = 20;
+            }
+            doc.text(`    - ${card.name}`, 30, yPos);
+            yPos += 5;
+          }
+        });
+      }
+      
+      // 자원 현황
+      yPos += 5;
+      const resources = Object.entries(RESOURCE_TYPES)
+        .filter(([key]) => playerState.resources[key] > 0)
+        .map(([key, name]) => `${name}: ${playerState.resources[key]}`)
+        .join(', ');
+      if (resources) {
+        doc.text(`  자원: ${resources}`, 25, yPos);
+        yPos += 6;
+      }
+    });
+    
+    // 파일명 생성
+    const fileName = `기술발달게임_결과_${currentDate.replace(/\//g, '-')}_${winner.name}.pdf`;
+    
+    // PDF 저장
+    doc.save(fileName);
   }
 }
 
