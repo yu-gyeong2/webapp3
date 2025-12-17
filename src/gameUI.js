@@ -28,6 +28,8 @@ export class GameUI {
     this.teleportMode = false; // 순간이동 모드 활성화 여부
     this.showCardAcquiredPopup = false; // 카드 획득 팝업 표시 여부
     this.acquiredCardName = null; // 획득한 카드 이름
+    this.showVictoryPopup = false; // 승리 팝업 표시 여부
+    this.victoryPlayer = null; // 승리한 플레이어
     this.gamePhase = 'nameInput'; // 'nameInput', 'tutorial', 'game'
     this.playerNames = ['', '', '', ''];
     this.init();
@@ -110,8 +112,10 @@ export class GameUI {
           this.gameState = nextTurn(this.gameState);
           this.popupTitle = null; // 기본 제목으로 리셋
           this.popupButtonText = null; // 기본 버튼 텍스트로 리셋
+          this.showTurnPopup = true; // 다음 턴 팝업 표시
+        } else {
+          this.showTurnPopup = false;
         }
-        this.showTurnPopup = false;
         this.render();
       });
     }
@@ -139,6 +143,9 @@ export class GameUI {
       }
       if (this.showCardAcquiredPopup) {
         this.setupCardAcquiredListener(); // 카드 획득 팝업 리스너
+      }
+      if (this.showVictoryPopup) {
+        this.setupVictoryPopupListener(); // 승리 팝업 리스너
       }
       if (this.gameState.gameOver) {
         this.setupPDFDownloadListener(); // PDF 다운로드 리스너
@@ -270,22 +277,26 @@ export class GameUI {
           </div>
         </div>
 
-        ${this.showTurnPopup && !this.gameState.gameOver ? `
+        ${this.showTurnPopup && !this.gameState.gameOver ? (() => {
+          // 팝업이 표시될 때마다 최신 플레이어 상태를 가져옴
+          const popupCurrentPlayer = this.gameState.players[this.gameState.currentPlayer];
+          const popupPlayerState = getCurrentPlayerState(this.gameState);
+          return `
           <div class="turn-popup-modal">
             <div class="turn-popup-content">
-              <h2>${this.popupTitle || currentPlayer.name + '의 차례'}</h2>
+              <h2>${this.popupTitle || popupCurrentPlayer.name + '의 차례'}</h2>
               <div class="turn-popup-stats">
                 <div class="popup-stat-row">
                   <span class="popup-label">기술 점수:</span>
-                  <span class="popup-value">${playerState.techScore}</span>
+                  <span class="popup-value">${popupPlayerState.techScore}</span>
                 </div>
                 <div class="popup-stat-row">
                   <span class="popup-label">과학 점수:</span>
-                  <span class="popup-value">${playerState.scienceScore}</span>
+                  <span class="popup-value">${popupPlayerState.scienceScore}</span>
                 </div>
                 <div class="popup-stat-row">
                   <span class="popup-label">획득 카드:</span>
-                  <span class="popup-value">${playerState.acquiredCards.length}개</span>
+                  <span class="popup-value">${popupPlayerState.acquiredCards.length}개</span>
                 </div>
                 <div class="popup-resources">
                   <div class="popup-label">자원:</div>
@@ -293,7 +304,7 @@ export class GameUI {
                     ${Object.entries(RESOURCE_TYPES).map(([key, name]) => `
                       <div class="popup-resource-item">
                         <span>${name}</span>
-                        <span class="popup-resource-count">${playerState.resources[key] || 0}</span>
+                        <span class="popup-resource-count">${popupPlayerState.resources[name] || 0}</span>
                       </div>
                     `).join('')}
                   </div>
@@ -302,7 +313,8 @@ export class GameUI {
               <button id="close-turn-popup" class="popup-close-btn">${this.popupButtonText || '확인'}</button>
             </div>
           </div>
-        ` : ''}
+        `;
+        })() : ''}
         
         ${this.showResourceSelectPopup && !this.gameState.gameOver ? `
           <div class="turn-popup-modal">
@@ -311,8 +323,8 @@ export class GameUI {
               <p>2배로 만들 자원을 선택하세요:</p>
               <div class="popup-resources">
                 ${(() => {
-                  const availableResources = Object.entries(RESOURCE_TYPES).filter(([key]) => {
-                    return (playerState.resources[key] || 0) > 0;
+                  const availableResources = Object.entries(RESOURCE_TYPES).filter(([key, name]) => {
+                    return (playerState.resources[name] || 0) > 0;
                   });
                   
                   if (availableResources.length === 0) {
@@ -322,9 +334,9 @@ export class GameUI {
                   return `
                     <div class="popup-resources-grid">
                       ${availableResources.map(([key, name]) => {
-                        const count = playerState.resources[key] || 0;
+                        const count = playerState.resources[name] || 0;
                         return `
-                          <div class="popup-resource-item resource-select-item ${this.selectedResourceForDouble === key ? 'selected' : ''}" data-resource="${key}">
+                          <div class="popup-resource-item resource-select-item ${this.selectedResourceForDouble === name ? 'selected' : ''}" data-resource="${name}">
                             <span class="popup-resource-name">${name}</span>
                             <span class="popup-resource-count">${count}개</span>
                           </div>
@@ -356,7 +368,7 @@ export class GameUI {
           </div>
         ` : ''}
         
-        ${this.showCardAcquiredPopup && !this.gameState.gameOver ? `
+        ${this.showCardAcquiredPopup && !this.gameState.gameOver && !this.showVictoryPopup ? `
           <div class="turn-popup-modal">
             <div class="turn-popup-content">
               <h2>카드 획득!</h2>
@@ -367,28 +379,51 @@ export class GameUI {
           </div>
         ` : ''}
         
-        ${this.gameState.gameOver ? `
+        ${this.showVictoryPopup ? `
+          <div class="turn-popup-modal">
+            <div class="turn-popup-content">
+              <h2 style="color: #FFD700; font-size: 2em; margin-bottom: 20px;">🎉 승리! 🎉</h2>
+              <p style="font-size: 1.5em; color: #667eea; font-weight: bold; margin: 20px 0;">
+                ${this.victoryPlayer ? this.victoryPlayer.name : '플레이어'} 👑의 승리!
+              </p>
+              <p style="font-size: 1.2em; margin: 20px 0;">"우주여행시대도래" 카드를 획득하여 승리했습니다!</p>
+              <button id="confirm-victory" class="popup-close-btn">확인</button>
+            </div>
+          </div>
+        ` : ''}
+        
+        ${this.gameState.gameOver && !this.showVictoryPopup ? `
           <div class="game-over-modal">
             <div class="modal-content">
               <h2>게임 종료!</h2>
-              <p>${currentPlayer.name} 승리!</p>
+              <p style="font-size: 1.3em; color: #667eea; font-weight: bold; margin: 20px 0;">
+                ${this.gameState.winner !== null ? this.gameState.players[this.gameState.winner].name : '플레이어'} 👑 승리!
+              </p>
               <div class="game-result-summary">
                 <h3>게임 결과</h3>
                 <div class="result-players">
                   ${this.gameState.players.map((player, index) => {
                     const playerState = this.gameState.playerStates[index];
+                    const isWinner = index === this.gameState.winner;
+                    const cardNames = playerState.acquiredCards.map(cardId => {
+                      const card = TECHNOLOGY_CARDS.find(c => c.id === cardId);
+                      return card ? card.name : '';
+                    }).filter(Boolean);
                     return `
                       <div class="result-player">
-                        <strong>${player.name}</strong>
+                        <strong style="color: ${player.color}; font-size: 1.2em;">
+                          ${player.name}${isWinner ? ' 👑' : ''}
+                        </strong>
                         <div>기술 점수: ${playerState.techScore}</div>
                         <div>과학 점수: ${playerState.scienceScore}</div>
                         <div>획득 카드: ${playerState.acquiredCards.length}개</div>
+                        ${cardNames.length > 0 ? `<div style="margin-top: 10px; font-size: 0.9em; color: #666;">${cardNames.join(', ')}</div>` : ''}
                       </div>
                     `;
                   }).join('')}
                 </div>
               </div>
-              <button id="download-pdf-btn" class="pdf-download-btn">PDF로 저장하기</button>
+              <button id="download-pdf-btn" class="pdf-download-btn">교사에게 제출하기</button>
             </div>
           </div>
         ` : ''}
@@ -555,7 +590,8 @@ export class GameUI {
         </div>
         <div class="player-resources">
           ${Object.entries(RESOURCE_TYPES).map(([key, name]) => {
-            const count = playerState.resources[key] || 0;
+            // resources는 값(예: '구리', '목재')을 키로 사용하므로 name을 사용
+            const count = playerState.resources[name] || 0;
             return `
               <div class="player-resource-item">
                 <span class="resource-name-small">${name}</span>
@@ -696,16 +732,39 @@ export class GameUI {
             // 자원 획득 (자원 타일에서만)
             const tile = this.board.getTile(x, y);
             if (tile && tile.resource) {
-              this.gameState = collectResource(tile.resource, this.gameState);
-              // 자원 획득 후 팝업 업데이트 (자원 현황이 실시간 반영되도록)
-              if (this.showTurnPopup) {
-                // 팝업이 열려있으면 다시 렌더링하여 자원 현황 업데이트
-                this.render();
-              }
-              // 자원 획득 후 팝업 표시 (collectResource가 자동으로 다음 턴으로 넘어감)
-              this.popupTitle = null; // 기본 제목으로 리셋
-              this.popupButtonText = null; // 기본 버튼 텍스트로 리셋
-              this.showTurnPopup = true; // 다음 턴 팝업 표시
+              // 자원 획득 전 현재 플레이어 ID 저장
+              const previousPlayerId = this.gameState.currentPlayer;
+              const previousPlayer = this.gameState.players[previousPlayerId];
+              
+              // 자원 획득 처리 (수동으로 처리하여 팝업 표시 제어)
+              const currentPlayerId = this.gameState.currentPlayer;
+              const playerState = this.gameState.playerStates[currentPlayerId];
+              
+              const newPlayerStates = [...this.gameState.playerStates];
+              newPlayerStates[currentPlayerId] = {
+                ...playerState,
+                resources: {
+                  ...playerState.resources,
+                  [tile.resource]: (playerState.resources[tile.resource] || 0) + 1
+                }
+              };
+              
+              this.gameState = {
+                ...this.gameState,
+                playerStates: newPlayerStates,
+                turnActionTaken: true
+              };
+              
+              // 자원 획득 후 팝업 표시 (자원 획득한 플레이어의 팝업)
+              this.popupTitle = `${previousPlayer.name} - ${tile.resource} 획득!`;
+              this.popupButtonText = '다음 턴으로';
+              this.showTurnPopup = true;
+              
+              // 플레이어 현황과 팝업 모두 업데이트
+              this.render();
+              
+              // 팝업 확인 후 다음 턴으로 넘어가도록 설정
+              // setupTurnPopupListener에서 처리됨
             } else {
               // 자원이 없는 타일로 이동한 경우에도 턴 종료
               this.gameState = {
@@ -872,7 +931,15 @@ export class GameUI {
           const lastCard = TECHNOLOGY_CARDS.find(c => c.id === lastAcquiredCardId);
           
           if (lastCard) {
-            if (lastCard.effect.doubleResource) {
+            // 승리 카드인 경우 승리 팝업 표시
+            if (lastCard.effect.win) {
+              this.showVictoryPopup = true;
+              this.victoryPlayer = this.gameState.players[this.gameState.currentPlayer];
+              this.render();
+              setTimeout(() => {
+                this.setupVictoryPopupListener();
+              }, 0);
+            } else if (lastCard.effect.doubleResource) {
               this.showResourceSelectPopup = true;
               this.selectedResourceForDouble = null;
               this.render();
@@ -883,7 +950,9 @@ export class GameUI {
               this.showTeleportPopup = true;
               this.teleportMode = false;
               this.render();
-              this.setupTeleportListeners();
+              setTimeout(() => {
+                this.setupTeleportListeners();
+              }, 0);
             } else {
               this.render();
             }
@@ -937,12 +1006,17 @@ export class GameUI {
         let allFilled = true;
         for (let i = 0; i < 4; i++) {
           const input = document.getElementById(`player-name-${i}`);
-          const name = input ? input.value.trim() : '';
-          if (!name) {
+          if (!input) {
             allFilled = false;
             break;
           }
-          names.push(name || `플레이어 ${i + 1}`);
+          // 입력 필드의 현재 값을 직접 읽어옴
+          const name = input.value.trim();
+          if (!name || name.length === 0) {
+            allFilled = false;
+            break;
+          }
+          names.push(name);
         }
         
         if (!allFilled) {
@@ -959,10 +1033,20 @@ export class GameUI {
       });
     }
     
-    // Enter 키로 다음 입력으로 이동
+    // Enter 키로 다음 입력으로 이동 및 실시간 이름 업데이트
     for (let i = 0; i < 4; i++) {
       const input = document.getElementById(`player-name-${i}`);
       if (input) {
+        // 실시간으로 이름 업데이트
+        input.addEventListener('input', (e) => {
+          this.playerNames[i] = e.target.value.trim();
+        });
+        
+        // 포커스가 벗어날 때도 업데이트
+        input.addEventListener('blur', (e) => {
+          this.playerNames[i] = e.target.value.trim();
+        });
+        
         input.addEventListener('keypress', (e) => {
           if (e.key === 'Enter') {
             if (i < 3) {
@@ -994,6 +1078,22 @@ export class GameUI {
         this.render();
       });
     }
+  }
+
+  setupVictoryPopupListener() {
+    setTimeout(() => {
+      const confirmBtn = document.getElementById('confirm-victory');
+      if (confirmBtn) {
+        const newConfirmBtn = confirmBtn.cloneNode(true);
+        confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
+        
+        newConfirmBtn.addEventListener('click', () => {
+          this.showVictoryPopup = false;
+          // 게임 종료 화면 표시 (이미 gameOver는 true로 설정되어 있음)
+          this.render();
+        });
+      }
+    }, 10);
   }
 
   setupPDFDownloadListener() {
@@ -1056,8 +1156,8 @@ export class GameUI {
       }
       
       const resources = Object.entries(RESOURCE_TYPES)
-        .filter(([key]) => playerState.resources[key] > 0)
-        .map(([key, name]) => `${name}: ${playerState.resources[key]}`)
+        .filter(([key, name]) => playerState.resources[name] > 0)
+        .map(([key, name]) => `${name}: ${playerState.resources[name]}`)
         .join(', ');
       
       if (resources) {
