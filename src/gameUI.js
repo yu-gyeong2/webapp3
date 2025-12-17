@@ -497,6 +497,9 @@ export class GameUI {
         // 순간이동 모드일 때 모든 타일을 클릭 가능하게 표시
         if (this.teleportMode && this.showTeleportPopup) {
           hex.classList.add('reachable');
+          // 순간이동 모드에서는 모든 타일이 클릭 가능하도록 스타일 강제 적용
+          hex.style.cursor = 'pointer';
+          hex.style.pointerEvents = 'auto';
         }
 
         // 말 표시
@@ -628,10 +631,11 @@ export class GameUI {
       
       const canAcquire = canAcquireCard(card, this.gameState);
       const isAcquired = playerState.acquiredCards.includes(card.id);
+      const actionTaken = this.gameState.turnActionTaken;
 
       if (isAcquired) {
         cardEl.classList.add('acquired');
-      } else if (!canAcquire) {
+      } else if (!canAcquire || actionTaken) {
         cardEl.classList.add('disabled');
       }
 
@@ -674,12 +678,17 @@ export class GameUI {
   setupBoardEventListeners() {
     const tiles = document.querySelectorAll('.hex-tile');
     tiles.forEach(tile => {
-      tile.addEventListener('click', (e) => {
-        const x = parseInt(tile.dataset.x);
-        const y = parseInt(tile.dataset.y);
+      // 기존 이벤트 리스너 제거를 위해 클론
+      const newTile = tile.cloneNode(true);
+      tile.parentNode.replaceChild(newTile, tile);
+      
+      newTile.addEventListener('click', (e) => {
+        const x = parseInt(newTile.dataset.x);
+        const y = parseInt(newTile.dataset.y);
 
-        // 순간이동 모드일 때
+        // 순간이동 모드일 때 - 모든 타일 클릭 가능
         if (this.teleportMode && this.showTeleportPopup) {
+          e.stopPropagation();
           const currentPlayerId = this.gameState.currentPlayer;
           const playerPiece = this.gameState.pieces.find(p => p.playerId === currentPlayerId);
           
@@ -688,9 +697,10 @@ export class GameUI {
             // 순간이동: 선택한 위치로 이동
             this.gameState = movePiece(pieceIndex, { x, y }, this.gameState);
             
-            // 순간이동 완료
+            // 순간이동 완료 후 턴 종료
             this.showTeleportPopup = false;
             this.teleportMode = false;
+            this.gameState = nextTurn(this.gameState);
             this.render();
           }
           return;
@@ -808,6 +818,12 @@ export class GameUI {
           return;
         }
 
+        // 이미 행동을 했으면 카드 획득 불가
+        if (this.gameState.turnActionTaken) {
+          alert('이미 이번 턴에 행동을 했습니다. 한 턴에 한 개의 카드만 획득할 수 있습니다.');
+          return;
+        }
+
         const cardId = card.dataset.cardId;
         const cardData = TECHNOLOGY_CARDS.find(c => c.id === cardId);
         
@@ -903,6 +919,8 @@ export class GameUI {
 
             this.showResourceSelectPopup = false;
             this.selectedResourceForDouble = null;
+            // 자원 2배 효과 처리 후 턴 종료
+            this.gameState = nextTurn(this.gameState);
             this.render();
           }
         });
@@ -954,9 +972,13 @@ export class GameUI {
                 this.setupTeleportListeners();
               }, 0);
             } else {
+              // 특수 효과가 없으면 턴 종료
+              this.gameState = nextTurn(this.gameState);
               this.render();
             }
           } else {
+            // 특수 효과가 없으면 턴 종료
+            this.gameState = nextTurn(this.gameState);
             this.render();
           }
         });

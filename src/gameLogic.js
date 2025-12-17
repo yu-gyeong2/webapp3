@@ -36,6 +36,11 @@ export function canAcquireCard(card, gameState) {
 }
 
 export function acquireCard(card, gameState) {
+  // 이미 행동을 했으면 무시
+  if (gameState.turnActionTaken) {
+    return { success: false, message: '이미 이번 턴에 행동을 했습니다. 한 턴에 한 개의 카드만 획득할 수 있습니다.' };
+  }
+
   if (!canAcquireCard(card, gameState)) {
     return { success: false, message: '카드를 획득할 수 없습니다.' };
   }
@@ -70,7 +75,8 @@ export function acquireCard(card, gameState) {
 
   const newState = {
     ...gameState,
-    playerStates: newPlayerStates
+    playerStates: newPlayerStates,
+    turnActionTaken: true // 카드 획득 후 턴 행동 완료 표시
   };
 
   // 승리 조건 체크
