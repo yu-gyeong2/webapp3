@@ -26,6 +26,8 @@ export class GameUI {
     this.selectedResourceForDouble = null; // 2배로 만들 자원
     this.showTeleportPopup = false; // 순간이동 팝업 표시 여부
     this.teleportMode = false; // 순간이동 모드 활성화 여부
+    this.showCardAcquiredPopup = false; // 카드 획득 팝업 표시 여부
+    this.acquiredCardName = null; // 획득한 카드 이름
     this.gamePhase = 'nameInput'; // 'nameInput', 'tutorial', 'game'
     this.playerNames = ['', '', '', ''];
     this.init();
@@ -134,6 +136,9 @@ export class GameUI {
       }
       if (this.showTeleportPopup) {
         this.setupTeleportListeners(); // 순간이동 팝업 리스너
+      }
+      if (this.showCardAcquiredPopup) {
+        this.setupCardAcquiredListener(); // 카드 획득 팝업 리스너
       }
       if (this.gameState.gameOver) {
         this.setupPDFDownloadListener(); // PDF 다운로드 리스너
@@ -305,20 +310,29 @@ export class GameUI {
               <h2>자원 선택</h2>
               <p>2배로 만들 자원을 선택하세요:</p>
               <div class="popup-resources">
-                <div class="popup-resources-grid">
-                  ${Object.entries(RESOURCE_TYPES).map(([key, name]) => {
-                    const count = playerState.resources[key] || 0;
-                    if (count > 0) {
-                      return `
-                        <div class="popup-resource-item resource-select-item ${this.selectedResourceForDouble === key ? 'selected' : ''}" data-resource="${key}">
-                          <span class="popup-resource-name">${name}</span>
-                          <span class="popup-resource-count">${count}개</span>
-                        </div>
-                      `;
-                    }
-                    return '';
-                  }).filter(Boolean).join('')}
-                </div>
+                ${(() => {
+                  const availableResources = Object.entries(RESOURCE_TYPES).filter(([key]) => {
+                    return (playerState.resources[key] || 0) > 0;
+                  });
+                  
+                  if (availableResources.length === 0) {
+                    return '<p style="color: #999; padding: 20px;">보유한 자원이 없습니다.</p>';
+                  }
+                  
+                  return `
+                    <div class="popup-resources-grid">
+                      ${availableResources.map(([key, name]) => {
+                        const count = playerState.resources[key] || 0;
+                        return `
+                          <div class="popup-resource-item resource-select-item ${this.selectedResourceForDouble === key ? 'selected' : ''}" data-resource="${key}">
+                            <span class="popup-resource-name">${name}</span>
+                            <span class="popup-resource-count">${count}개</span>
+                          </div>
+                        `;
+                      }).join('')}
+                    </div>
+                  `;
+                })()}
               </div>
               <button id="confirm-resource-double" class="popup-close-btn" ${this.selectedResourceForDouble ? '' : 'disabled'}>확인</button>
             </div>
@@ -329,8 +343,26 @@ export class GameUI {
           <div class="turn-popup-modal">
             <div class="turn-popup-content">
               <h2>순간이동</h2>
-              <p>이동을 원하는 곳을 선택하세요:</p>
-              <p style="font-size: 0.9em; color: #666; margin-top: 10px;">보드에서 원하는 위치를 클릭하세요</p>
+              ${!this.teleportMode ? `
+                <p>순간이동을 사용하시겠습니까?</p>
+                <p style="font-size: 0.9em; color: #666; margin-top: 10px;">확인 버튼을 누른 후 보드에서 원하는 위치를 클릭하세요</p>
+                <button id="confirm-teleport-start" class="popup-close-btn">확인</button>
+              ` : `
+                <p>이동을 원하는 곳을 선택하세요:</p>
+                <p style="font-size: 0.9em; color: #666; margin-top: 10px;">보드에서 원하는 위치를 클릭하세요</p>
+                <button id="cancel-teleport" class="popup-close-btn" style="background: linear-gradient(135deg, #dc3545 0%, #c82333 100%); margin-top: 10px;">취소</button>
+              `}
+            </div>
+          </div>
+        ` : ''}
+        
+        ${this.showCardAcquiredPopup && !this.gameState.gameOver ? `
+          <div class="turn-popup-modal">
+            <div class="turn-popup-content">
+              <h2>카드 획득!</h2>
+              <p style="font-size: 1.2em; color: #667eea; font-weight: bold; margin: 20px 0;">${this.acquiredCardName}</p>
+              <p>카드를 성공적으로 획득했습니다!</p>
+              <button id="confirm-card-acquired" class="popup-close-btn">확인</button>
             </div>
           </div>
         ` : ''}
@@ -523,7 +555,7 @@ export class GameUI {
         </div>
         <div class="player-resources">
           ${Object.entries(RESOURCE_TYPES).map(([key, name]) => {
-            const count = playerState.resources[name];
+            const count = playerState.resources[key] || 0;
             return `
               <div class="player-resource-item">
                 <span class="resource-name-small">${name}</span>
@@ -532,8 +564,16 @@ export class GameUI {
             `;
           }).join('')}
         </div>
-        <div class="player-cards-count">
-          획득 카드: <strong>${playerState.acquiredCards.length}</strong>개
+        <div class="player-cards">
+          <div class="player-cards-header">획득 카드: <strong>${playerState.acquiredCards.length}</strong>개</div>
+          ${playerState.acquiredCards.length > 0 ? `
+            <div class="player-cards-list">
+              ${playerState.acquiredCards.map(cardId => {
+                const card = TECHNOLOGY_CARDS.find(c => c.id === cardId);
+                return card ? `<div class="acquired-card-name">• ${card.name}</div>` : '';
+              }).filter(Boolean).join('')}
+            </div>
+          ` : '<div class="no-cards">획득한 카드가 없습니다</div>'}
         </div>
       `;
       
@@ -657,6 +697,11 @@ export class GameUI {
             const tile = this.board.getTile(x, y);
             if (tile && tile.resource) {
               this.gameState = collectResource(tile.resource, this.gameState);
+              // 자원 획득 후 팝업 업데이트 (자원 현황이 실시간 반영되도록)
+              if (this.showTurnPopup) {
+                // 팝업이 열려있으면 다시 렌더링하여 자원 현황 업데이트
+                this.render();
+              }
               // 자원 획득 후 팝업 표시 (collectResource가 자동으로 다음 턴으로 넘어감)
               this.popupTitle = null; // 기본 제목으로 리셋
               this.popupButtonText = null; // 기본 버튼 텍스트로 리셋
@@ -712,22 +757,15 @@ export class GameUI {
           if (result.success) {
             this.gameState = result.newState;
             
-            // 자원 2배 효과가 있으면 팝업 표시
-            if (cardData.effect.doubleResource) {
-              this.showResourceSelectPopup = true;
-              this.selectedResourceForDouble = null;
-              this.render();
-              this.setupResourceSelectListeners();
-            } 
-            // 순간이동 효과가 있으면 팝업 표시
-            else if (cardData.effect.teleport) {
-              this.showTeleportPopup = true;
-              this.teleportMode = true;
-              this.render();
-              this.setupTeleportListeners();
-            } else {
-              this.render();
-            }
+            // 카드 획득 팝업 표시
+            this.showCardAcquiredPopup = true;
+            this.acquiredCardName = cardData.name;
+            this.render();
+            
+            // 카드 획득 팝업 리스너 설정
+            setTimeout(() => {
+              this.setupCardAcquiredListener();
+            }, 0);
           } else {
             alert(result.message);
           }
@@ -737,58 +775,157 @@ export class GameUI {
   }
 
   setupResourceSelectListeners() {
-    // 자원 선택
-    const resourceItems = document.querySelectorAll('.resource-select-item');
-    resourceItems.forEach(item => {
-      item.addEventListener('click', () => {
-        const resourceKey = item.dataset.resource;
-        this.selectedResourceForDouble = resourceKey;
-        // 선택 상태 업데이트
-        resourceItems.forEach(i => i.classList.remove('selected'));
-        item.classList.add('selected');
-        // 확인 버튼 활성화
-        const confirmBtn = document.getElementById('confirm-resource-double');
-        if (confirmBtn) {
-          confirmBtn.disabled = false;
-        }
+    // DOM이 완전히 렌더링될 때까지 대기
+    setTimeout(() => {
+      // 자원 선택
+      const resourceItems = document.querySelectorAll('.resource-select-item');
+      
+      if (resourceItems.length === 0) {
+        console.warn('자원 선택 항목을 찾을 수 없습니다. 플레이어가 보유한 자원이 없을 수 있습니다.');
+        return;
+      }
+      
+      resourceItems.forEach(item => {
+        // 기존 리스너 제거를 위해 클론
+        const newItem = item.cloneNode(true);
+        item.parentNode.replaceChild(newItem, item);
+        
+        newItem.addEventListener('click', () => {
+          const resourceKey = newItem.dataset.resource;
+          this.selectedResourceForDouble = resourceKey;
+          // 선택 상태 업데이트
+          const allItems = document.querySelectorAll('.resource-select-item');
+          allItems.forEach(i => i.classList.remove('selected'));
+          newItem.classList.add('selected');
+          // 확인 버튼 활성화
+          const confirmBtn = document.getElementById('confirm-resource-double');
+          if (confirmBtn) {
+            confirmBtn.disabled = false;
+            confirmBtn.style.opacity = '1';
+            confirmBtn.style.cursor = 'pointer';
+          }
+        });
       });
-    });
 
-    // 확인 버튼
-    const confirmBtn = document.getElementById('confirm-resource-double');
-    if (confirmBtn) {
-      confirmBtn.addEventListener('click', () => {
-        if (this.selectedResourceForDouble) {
-          // 선택한 자원을 2배로 만들기
+      // 확인 버튼
+      const confirmBtn = document.getElementById('confirm-resource-double');
+      if (confirmBtn) {
+        // 기존 리스너 제거를 위해 클론
+        const newConfirmBtn = confirmBtn.cloneNode(true);
+        confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
+        
+        // 초기 상태 설정
+        if (!this.selectedResourceForDouble) {
+          newConfirmBtn.disabled = true;
+          newConfirmBtn.style.opacity = '0.6';
+          newConfirmBtn.style.cursor = 'not-allowed';
+        }
+        
+        newConfirmBtn.addEventListener('click', () => {
+          if (this.selectedResourceForDouble) {
+            // 선택한 자원을 2배로 만들기
+            const currentPlayerId = this.gameState.currentPlayer;
+            const playerState = this.gameState.playerStates[currentPlayerId];
+            const currentCount = playerState.resources[this.selectedResourceForDouble] || 0;
+            
+            const newPlayerStates = [...this.gameState.playerStates];
+            newPlayerStates[currentPlayerId] = {
+              ...playerState,
+              resources: {
+                ...playerState.resources,
+                [this.selectedResourceForDouble]: currentCount * 2
+              }
+            };
+
+            this.gameState = {
+              ...this.gameState,
+              playerStates: newPlayerStates
+            };
+
+            this.showResourceSelectPopup = false;
+            this.selectedResourceForDouble = null;
+            this.render();
+          }
+        });
+      } else {
+        console.warn('확인 버튼을 찾을 수 없습니다.');
+      }
+    }, 10);
+  }
+
+  setupCardAcquiredListener() {
+    // DOM이 완전히 렌더링될 때까지 대기
+    setTimeout(() => {
+      const confirmBtn = document.getElementById('confirm-card-acquired');
+      if (confirmBtn) {
+        const newConfirmBtn = confirmBtn.cloneNode(true);
+        confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
+        
+        newConfirmBtn.addEventListener('click', () => {
+          this.showCardAcquiredPopup = false;
+          this.acquiredCardName = null;
+          
+          // 특수 효과가 있으면 다음 팝업 표시
           const currentPlayerId = this.gameState.currentPlayer;
           const playerState = this.gameState.playerStates[currentPlayerId];
-          const currentCount = playerState.resources[this.selectedResourceForDouble] || 0;
+          const lastAcquiredCardId = playerState.acquiredCards[playerState.acquiredCards.length - 1];
+          const lastCard = TECHNOLOGY_CARDS.find(c => c.id === lastAcquiredCardId);
           
-          const newPlayerStates = [...this.gameState.playerStates];
-          newPlayerStates[currentPlayerId] = {
-            ...playerState,
-            resources: {
-              ...playerState.resources,
-              [this.selectedResourceForDouble]: currentCount * 2
+          if (lastCard) {
+            if (lastCard.effect.doubleResource) {
+              this.showResourceSelectPopup = true;
+              this.selectedResourceForDouble = null;
+              this.render();
+              setTimeout(() => {
+                this.setupResourceSelectListeners();
+              }, 0);
+            } else if (lastCard.effect.teleport) {
+              this.showTeleportPopup = true;
+              this.teleportMode = false;
+              this.render();
+              this.setupTeleportListeners();
+            } else {
+              this.render();
             }
-          };
-
-          this.gameState = {
-            ...this.gameState,
-            playerStates: newPlayerStates
-          };
-
-          this.showResourceSelectPopup = false;
-          this.selectedResourceForDouble = null;
-          this.render();
-        }
-      });
-    }
+          } else {
+            this.render();
+          }
+        });
+      }
+    }, 10);
   }
 
   setupTeleportListeners() {
-    // 순간이동 팝업은 보드 클릭으로 처리되므로 여기서는 특별한 처리가 필요 없음
-    // 보드의 모든 타일이 클릭 가능하도록 setupBoardEventListeners에서 처리됨
+    // DOM이 완전히 렌더링될 때까지 대기
+    setTimeout(() => {
+      // 순간이동 시작 확인 버튼
+      const confirmStartBtn = document.getElementById('confirm-teleport-start');
+      if (confirmStartBtn) {
+        const newConfirmBtn = confirmStartBtn.cloneNode(true);
+        confirmStartBtn.parentNode.replaceChild(newConfirmBtn, confirmStartBtn);
+        
+        newConfirmBtn.addEventListener('click', () => {
+          // 순간이동 모드 활성화 (팝업은 유지하되 내용 변경)
+          this.teleportMode = true;
+          this.render();
+          // 보드 이벤트 리스너 다시 설정
+          this.setupBoardEventListeners();
+        });
+      }
+      
+      // 취소 버튼
+      const cancelBtn = document.getElementById('cancel-teleport');
+      if (cancelBtn) {
+        const newCancelBtn = cancelBtn.cloneNode(true);
+        cancelBtn.parentNode.replaceChild(newCancelBtn, cancelBtn);
+        
+        newCancelBtn.addEventListener('click', () => {
+          this.showTeleportPopup = false;
+          this.teleportMode = false;
+          this.render();
+        });
+      }
+    }, 10);
   }
 
   setupNameInputListeners() {
@@ -868,93 +1005,151 @@ export class GameUI {
     }
   }
 
-  generatePDF() {
-    // jsPDF가 전역 객체로 로드됨
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF();
-    
+  async generatePDF() {
+    // 게임 결과를 HTML로 생성
     const winner = this.gameState.players[this.gameState.winner];
     const currentDate = new Date().toLocaleDateString('ko-KR');
     
-    // 제목
-    doc.setFontSize(20);
-    doc.text('기술 발달 게임 결과', 105, 20, { align: 'center' });
-    
-    // 날짜
-    doc.setFontSize(12);
-    doc.text(`게임 날짜: ${currentDate}`, 105, 30, { align: 'center' });
-    
-    // 승리자
-    doc.setFontSize(16);
-    doc.text(`승리자: ${winner.name}`, 105, 45, { align: 'center' });
-    
-    // 플레이어별 결과
-    let yPos = 60;
-    doc.setFontSize(14);
-    doc.text('플레이어별 결과', 105, yPos, { align: 'center' });
-    yPos += 10;
+    // 결과 HTML 생성 (한글 폰트 명시적 지정)
+    let resultHTML = `
+      <div style="font-family: 'Noto Sans KR', 'Malgun Gothic', '맑은 고딕', sans-serif; padding: 20px; max-width: 800px; margin: 0 auto; font-size: 14px;">
+        <h1 style="text-align: center; color: #1e3c72; margin-bottom: 20px; font-family: 'Noto Sans KR', sans-serif;">기술 발달 게임 결과</h1>
+        <p style="text-align: center; color: #666; margin-bottom: 10px; font-family: 'Noto Sans KR', sans-serif;">게임 날짜: ${currentDate}</p>
+        <h2 style="text-align: center; color: #667eea; margin: 20px 0; font-family: 'Noto Sans KR', sans-serif;">승리자: ${winner.name}</h2>
+        <div style="margin-top: 30px;">
+          <h3 style="color: #1e3c72; border-bottom: 2px solid #667eea; padding-bottom: 10px; font-family: 'Noto Sans KR', sans-serif;">플레이어별 결과</h3>
+    `;
     
     this.gameState.players.forEach((player, index) => {
       const playerState = this.gameState.playerStates[index];
       const isWinner = index === this.gameState.winner;
       
-      yPos += 10;
-      if (yPos > 270) {
-        doc.addPage();
-        yPos = 20;
-      }
+      resultHTML += `
+        <div style="margin: 20px 0; padding: 15px; background: ${isWinner ? '#fff9e6' : '#f8f9fa'}; border-radius: 8px; border-left: 4px solid ${isWinner ? '#ffc107' : '#667eea'}; font-family: 'Noto Sans KR', sans-serif;">
+          <h4 style="color: ${isWinner ? '#ff6b00' : '#1e3c72'}; margin: 0 0 10px 0; font-family: 'Noto Sans KR', sans-serif;">
+            ${player.name}${isWinner ? ' (승리!)' : ''}
+          </h4>
+          <div style="margin: 8px 0; font-family: 'Noto Sans KR', sans-serif;">
+            <strong>기술 점수:</strong> ${playerState.techScore}
+          </div>
+          <div style="margin: 8px 0; font-family: 'Noto Sans KR', sans-serif;">
+            <strong>과학 점수:</strong> ${playerState.scienceScore}
+          </div>
+          <div style="margin: 8px 0; font-family: 'Noto Sans KR', sans-serif;">
+            <strong>획득 카드 수:</strong> ${playerState.acquiredCards.length}개
+          </div>
+      `;
       
-      // 플레이어 이름 (승리자는 굵게)
-      doc.setFontSize(12);
-      if (isWinner) {
-        doc.setFont(undefined, 'bold');
-      }
-      doc.text(`${player.name}${isWinner ? ' (승리!)' : ''}`, 20, yPos);
-      doc.setFont(undefined, 'normal');
-      
-      yPos += 7;
-      doc.setFontSize(10);
-      doc.text(`  기술 점수: ${playerState.techScore}`, 25, yPos);
-      yPos += 6;
-      doc.text(`  과학 점수: ${playerState.scienceScore}`, 25, yPos);
-      yPos += 6;
-      doc.text(`  획득 카드 수: ${playerState.acquiredCards.length}개`, 25, yPos);
-      
-      // 획득한 카드 목록
       if (playerState.acquiredCards.length > 0) {
-        yPos += 6;
-        doc.text(`  획득 카드:`, 25, yPos);
-        yPos += 6;
+        resultHTML += `
+          <div style="margin: 8px 0; font-family: 'Noto Sans KR', sans-serif;">
+            <strong>획득 카드:</strong>
+            <ul style="margin: 5px 0; padding-left: 20px; font-family: 'Noto Sans KR', sans-serif;">
+        `;
         playerState.acquiredCards.forEach(cardId => {
           const card = TECHNOLOGY_CARDS.find(c => c.id === cardId);
           if (card) {
-            if (yPos > 270) {
-              doc.addPage();
-              yPos = 20;
-            }
-            doc.text(`    - ${card.name}`, 30, yPos);
-            yPos += 5;
+            resultHTML += `<li style="font-family: 'Noto Sans KR', sans-serif;">${card.name}</li>`;
           }
         });
+        resultHTML += `</ul></div>`;
       }
       
-      // 자원 현황
-      yPos += 5;
       const resources = Object.entries(RESOURCE_TYPES)
         .filter(([key]) => playerState.resources[key] > 0)
         .map(([key, name]) => `${name}: ${playerState.resources[key]}`)
         .join(', ');
+      
       if (resources) {
-        doc.text(`  자원: ${resources}`, 25, yPos);
-        yPos += 6;
+        resultHTML += `
+          <div style="margin: 8px 0; font-family: 'Noto Sans KR', sans-serif;">
+            <strong>자원:</strong> ${resources}
+          </div>
+        `;
+      }
+      
+      resultHTML += `</div>`;
+    });
+    
+    resultHTML += `</div></div>`;
+    
+    // 임시 div 생성 및 HTML 삽입
+    const tempDiv = document.createElement('div');
+    tempDiv.style.position = 'absolute';
+    tempDiv.style.left = '-9999px';
+    tempDiv.style.top = '0';
+    tempDiv.style.width = '800px';
+    tempDiv.style.fontFamily = "'Noto Sans KR', 'Malgun Gothic', '맑은 고딕', sans-serif";
+    tempDiv.innerHTML = resultHTML;
+    document.body.appendChild(tempDiv);
+    
+    // 폰트 로드 대기 (한글 폰트가 제대로 렌더링되도록)
+    await new Promise((resolve) => {
+      if (document.fonts && document.fonts.ready) {
+        document.fonts.ready.then(() => {
+          // 추가 대기 시간 (폰트 렌더링 완료 보장)
+          setTimeout(resolve, 500);
+        });
+      } else {
+        // 폰트 API가 없는 경우 기본 대기 시간
+        setTimeout(resolve, 1000);
       }
     });
     
-    // 파일명 생성
-    const fileName = `기술발달게임_결과_${currentDate.replace(/\//g, '-')}_${winner.name}.pdf`;
-    
-    // PDF 저장
-    doc.save(fileName);
+    try {
+      // html2canvas를 사용하여 HTML을 이미지로 변환
+      // html2canvas는 CDN에서 로드되므로 window 객체를 통해 접근
+      if (typeof window.html2canvas === 'undefined') {
+        alert('html2canvas 라이브러리가 로드되지 않았습니다. 페이지를 새로고침해주세요.');
+        document.body.removeChild(tempDiv);
+        return;
+      }
+      
+      const canvas = await window.html2canvas(tempDiv, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff',
+        onclone: (clonedDoc) => {
+          // 클론된 문서에도 폰트 적용
+          const clonedBody = clonedDoc.body;
+          clonedBody.style.fontFamily = "'Noto Sans KR', 'Malgun Gothic', '맑은 고딕', sans-serif";
+        }
+      });
+      
+      // jsPDF로 PDF 생성
+      const { jsPDF } = window.jspdf;
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      
+      const imgWidth = 210; // A4 너비 (mm)
+      const pageHeight = 297; // A4 높이 (mm)
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      let heightLeft = imgHeight;
+      let position = 0;
+      
+      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+      
+      while (heightLeft > 0) {
+        position = heightLeft - imgHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+      }
+      
+      // 파일명 생성
+      const fileName = `기술발달게임_결과_${currentDate.replace(/\//g, '-')}_${winner.name}.pdf`;
+      
+      // PDF 저장
+      pdf.save(fileName);
+    } catch (error) {
+      console.error('PDF 생성 오류:', error);
+      alert('PDF 생성 중 오류가 발생했습니다. 다시 시도해주세요.');
+    } finally {
+      // 임시 div 제거
+      document.body.removeChild(tempDiv);
+    }
   }
 }
 

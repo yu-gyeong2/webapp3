@@ -18,7 +18,8 @@ export class HexBoard {
           y,
           resource: null,
           isEmpty: true,
-          isStart: false
+          isStart: false,
+          resourceCollected: false // 자원이 획득되었는지 여부
         };
       }
     }
@@ -51,7 +52,6 @@ export class HexBoard {
         this.placeResourceAt([4, 0], '목재');
         this.placeResourceAt([3, 2], '철');
         this.placeResourceAt([1, 3], 'U');
-        this.placeResourceAt([0, 4], '탄소나노튜브');
         this.placeResourceAt([4, 1], '구리');
         this.placeResourceAt([2, 3], '목재');
       }
@@ -66,7 +66,6 @@ export class HexBoard {
         this.placeResourceAt([11, 0], '목재');
         this.placeResourceAt([12, 2], '철');
         this.placeResourceAt([14, 3], 'U');
-        this.placeResourceAt([15, 4], '탄소나노튜브');
         this.placeResourceAt([11, 1], '구리');
         this.placeResourceAt([13, 3], '목재');
       }
@@ -81,7 +80,6 @@ export class HexBoard {
         this.placeResourceAt([4, 9], '목재');
         this.placeResourceAt([3, 7], '철');
         this.placeResourceAt([1, 6], 'U');
-        this.placeResourceAt([0, 5], '탄소나노튜브');
         this.placeResourceAt([4, 8], '구리');
         this.placeResourceAt([2, 6], '목재');
       }
@@ -96,26 +94,26 @@ export class HexBoard {
         this.placeResourceAt([11, 9], '목재');
         this.placeResourceAt([12, 7], '철');
         this.placeResourceAt([14, 6], 'U');
-        this.placeResourceAt([15, 5], '탄소나노튜브');
         this.placeResourceAt([11, 8], '구리');
         this.placeResourceAt([13, 6], '목재');
       }
     });
 
     // 중앙 지역에도 자원 배치 (모든 플레이어가 접근 가능)
-    const centerCopper = [[7, 4], [8, 4], [7, 5], [8, 5]];
+    // 탄소나노튜브를 가운데 4개 위치에 배치 (원래 구리 위치)
+    const centerCarbonNanotube = [[7, 4], [8, 4], [7, 5], [8, 5]];
     const centerWood = [[6, 4], [9, 4], [6, 5], [9, 5]];
     const centerIron = [[5, 4], [10, 4], [5, 5], [10, 5]];
     const centerCoal = [[7, 3], [8, 3], [7, 6], [8, 6]];
     const centerUranium = [[6, 3], [9, 3], [6, 6], [9, 6]];
+    const centerCopper = [[5, 3], [10, 3], [5, 6], [10, 6]]; // 구리를 다른 위치로 이동
     
-    centerCopper.forEach(([x, y]) => this.placeResourceAt([x, y], '구리'));
+    centerCarbonNanotube.forEach(([x, y]) => this.placeResourceAt([x, y], '탄소나노튜브'));
     centerWood.forEach(([x, y]) => this.placeResourceAt([x, y], '목재'));
     centerIron.forEach(([x, y]) => this.placeResourceAt([x, y], '철'));
     centerCoal.forEach(([x, y]) => this.placeResourceAt([x, y], '석탄'));
     centerUranium.forEach(([x, y]) => this.placeResourceAt([x, y], 'U'));
-    // 탄소나노튜브는 중앙에 하나만 (플레이어 주변에 이미 배치되어 있으므로 중앙에는 선택적으로)
-    this.placeResourceAt([7, 4], '탄소나노튜브');
+    centerCopper.forEach(([x, y]) => this.placeResourceAt([x, y], '구리'));
 
     // 시작 지점 설정
     startPositions.forEach(start => {
@@ -131,7 +129,24 @@ export class HexBoard {
     if (this.isValidPosition(x, y) && !this.tiles[y][x].isStart && !this.tiles[y][x].resource) {
       this.tiles[y][x].resource = resourceType;
       this.tiles[y][x].isEmpty = false;
+      this.tiles[y][x].resourceCollected = false; // 초기값은 미획득
     }
+  }
+  
+  // 자원 획득 처리
+  collectResourceAt(x, y) {
+    if (this.isValidPosition(x, y)) {
+      const tile = this.tiles[y][x];
+      // resourceCollected 속성이 없으면 false로 초기화
+      if (tile.resourceCollected === undefined) {
+        tile.resourceCollected = false;
+      }
+      if (tile.resource && !tile.resourceCollected) {
+        tile.resourceCollected = true;
+        return tile.resource;
+      }
+    }
+    return null;
   }
 
   isValidPosition(x, y) {
@@ -144,27 +159,33 @@ export class HexBoard {
   }
 
   // 육각형 인접 타일 찾기 (offset 좌표계)
+  // 육각형 보드에서 인접한 타일은 면(edge)으로 연결된 6개의 타일입니다
+  // 렌더링 코드에서 x % 2를 사용하므로, 여기서도 x 좌표를 기준으로 합니다
   getNeighbors(x, y) {
     const neighbors = [];
-    // 짝수 행 기준 offset
+    
+    // offset 좌표계에서 열(x)이 짝수인지 홀수인지에 따라 인접 타일이 다릅니다
+    // 짝수 열(x가 짝수) 기준 offset - "even-r" 좌표계
     const offsetsEven = [
-      [1, 0],   // 오른쪽
-      [-1, 0],  // 왼쪽
-      [0, 1],   // 아래
-      [0, -1],  // 위
-      [1, 1],   // 오른쪽 아래
-      [1, -1]   // 오른쪽 위
+      [1, 0],   // 동쪽 (오른쪽)
+      [-1, 0],  // 서쪽 (왼쪽)
+      [0, 1],   // 남쪽 (아래)
+      [0, -1],  // 북쪽 (위)
+      [1, 1],   // 남동쪽 (오른쪽 아래)
+      [1, -1]   // 북동쪽 (오른쪽 위)
     ];
-    // 홀수 행 기준 offset
+    
+    // 홀수 열(x가 홀수) 기준 offset - "odd-r" 좌표계
     const offsetsOdd = [
-      [1, 0],   // 오른쪽
-      [-1, 0],  // 왼쪽
-      [0, 1],   // 아래
-      [0, -1],  // 위
-      [-1, 1],  // 왼쪽 아래
-      [-1, -1]  // 왼쪽 위
+      [1, 0],   // 동쪽 (오른쪽)
+      [-1, 0],  // 서쪽 (왼쪽)
+      [0, 1],   // 남쪽 (아래)
+      [0, -1],  // 북쪽 (위)
+      [-1, 1],  // 남서쪽 (왼쪽 아래)
+      [-1, -1]  // 북서쪽 (왼쪽 위)
     ];
 
+    // 열(x)이 짝수인지 홀수인지에 따라 offset 선택
     const offsets = x % 2 === 0 ? offsetsEven : offsetsOdd;
 
     offsets.forEach(([dx, dy]) => {
