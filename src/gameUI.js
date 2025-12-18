@@ -352,13 +352,14 @@ export class GameUI {
         ` : ''}
         
         ${this.showTeleportPopup && !this.gameState.gameOver ? `
-          <div class="turn-popup-modal">
-            <div class="turn-popup-content">
+          <div class="turn-popup-modal" style="pointer-events: ${this.teleportMode ? 'none' : 'auto'};">
+            <div class="turn-popup-content" style="pointer-events: auto; ${this.teleportMode ? 'opacity: 0.7; transform: scale(0.9); top: 20px;' : ''}">
               <h2>순간이동</h2>
               ${!this.teleportMode ? `
                 <p>순간이동을 사용하시겠습니까?</p>
                 <p style="font-size: 0.9em; color: #666; margin-top: 10px;">확인 버튼을 누른 후 보드에서 원하는 위치를 클릭하세요</p>
                 <button id="confirm-teleport-start" class="popup-close-btn">확인</button>
+                <button id="cancel-teleport" class="popup-close-btn" style="background: linear-gradient(135deg, #dc3545 0%, #c82333 100%); margin-top: 10px;">취소</button>
               ` : `
                 <p>이동을 원하는 곳을 선택하세요:</p>
                 <p style="font-size: 0.9em; color: #666; margin-top: 10px;">보드에서 원하는 위치를 클릭하세요</p>
@@ -691,6 +692,7 @@ export class GameUI {
         // 순간이동 모드일 때 - 모든 타일 클릭 가능
         if (this.teleportMode && this.showTeleportPopup) {
           e.stopPropagation();
+          e.preventDefault();
           const currentPlayerId = this.gameState.currentPlayer;
           const playerPiece = this.gameState.pieces.find(p => p.playerId === currentPlayerId);
           
@@ -698,6 +700,24 @@ export class GameUI {
             const pieceIndex = this.gameState.pieces.indexOf(playerPiece);
             // 순간이동: 선택한 위치로 이동
             this.gameState = movePiece(pieceIndex, { x, y }, this.gameState);
+            
+            // 자원 획득 처리 (자원 타일인 경우)
+            const tile = this.board.getTile(x, y);
+            if (tile && tile.resource) {
+              const playerState = this.gameState.playerStates[currentPlayerId];
+              const newPlayerStates = [...this.gameState.playerStates];
+              newPlayerStates[currentPlayerId] = {
+                ...playerState,
+                resources: {
+                  ...playerState.resources,
+                  [tile.resource]: (playerState.resources[tile.resource] || 0) + 1
+                }
+              };
+              this.gameState = {
+                ...this.gameState,
+                playerStates: newPlayerStates
+              };
+            }
             
             // 순간이동 완료 후 턴 종료
             this.showTeleportPopup = false;
@@ -1018,7 +1038,9 @@ export class GameUI {
           this.teleportMode = true;
           this.render();
           // 보드 이벤트 리스너 다시 설정
-          this.setupBoardEventListeners();
+          setTimeout(() => {
+            this.setupBoardEventListeners();
+          }, 0);
         });
       }
       
@@ -1029,8 +1051,11 @@ export class GameUI {
         cancelBtn.parentNode.replaceChild(newCancelBtn, cancelBtn);
         
         newCancelBtn.addEventListener('click', () => {
+          // 취소 시 다음 턴으로 넘어가도록 수정
           this.showTeleportPopup = false;
           this.teleportMode = false;
+          // 턴 종료 처리
+          this.gameState = nextTurn(this.gameState);
           this.render();
         });
       }
