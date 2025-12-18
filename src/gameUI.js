@@ -163,7 +163,7 @@ export class GameUI {
       return `
         <div class="game-container">
           <div class="start-screen">
-            <h1>기술 발달 게임</h1>
+            <h1>기술 발달 게임 🎮</h1>
             <div class="name-input-section">
               <h2>플레이어 이름 입력</h2>
               <div class="name-inputs">
@@ -632,10 +632,12 @@ export class GameUI {
       const canAcquire = canAcquireCard(card, this.gameState);
       const isAcquired = playerState.acquiredCards.includes(card.id);
       const actionTaken = this.gameState.turnActionTaken;
+      // 카드 획득 팝업이 표시 중이거나 이미 행동을 했으면 비활성화
+      const isPopupShowing = this.showCardAcquiredPopup || this.showResourceSelectPopup || this.showTeleportPopup || this.showVictoryPopup;
 
       if (isAcquired) {
         cardEl.classList.add('acquired');
-      } else if (!canAcquire || actionTaken) {
+      } else if (!canAcquire || actionTaken || isPopupShowing) {
         cardEl.classList.add('disabled');
       }
 
@@ -813,8 +815,18 @@ export class GameUI {
   setupCardEventListeners() {
     const cards = document.querySelectorAll('.tech-card');
     cards.forEach(card => {
-      card.addEventListener('click', () => {
-        if (card.classList.contains('disabled') || card.classList.contains('acquired')) {
+      // 기존 이벤트 리스너 제거를 위해 클론
+      const newCard = card.cloneNode(true);
+      card.parentNode.replaceChild(newCard, card);
+      
+      newCard.addEventListener('click', () => {
+        // 이미 획득한 카드이거나 비활성화된 카드는 클릭 불가
+        if (newCard.classList.contains('disabled') || newCard.classList.contains('acquired')) {
+          return;
+        }
+
+        // 팝업이 표시 중이면 카드 획득 불가
+        if (this.showCardAcquiredPopup || this.showResourceSelectPopup || this.showTeleportPopup || this.showVictoryPopup) {
           return;
         }
 
@@ -824,10 +836,16 @@ export class GameUI {
           return;
         }
 
-        const cardId = card.dataset.cardId;
+        const cardId = newCard.dataset.cardId;
         const cardData = TECHNOLOGY_CARDS.find(c => c.id === cardId);
         
         if (cardData) {
+          // 한 번 더 체크 (이중 방어)
+          if (this.gameState.turnActionTaken) {
+            alert('이미 이번 턴에 행동을 했습니다. 한 턴에 한 개의 카드만 획득할 수 있습니다.');
+            return;
+          }
+          
           const result = acquireCard(cardData, this.gameState);
           if (result.success) {
             this.gameState = result.newState;
@@ -1020,67 +1038,81 @@ export class GameUI {
   }
 
   setupNameInputListeners() {
-    const startBtn = document.getElementById('start-game-btn');
-    if (startBtn) {
-      startBtn.addEventListener('click', () => {
-        // 이름 입력 확인
-        const names = [];
-        let allFilled = true;
-        for (let i = 0; i < 4; i++) {
-          const input = document.getElementById(`player-name-${i}`);
-          if (!input) {
-            allFilled = false;
-            break;
-          }
-          // 입력 필드의 현재 값을 직접 읽어옴
-          const name = input.value.trim();
-          if (!name || name.length === 0) {
-            allFilled = false;
-            break;
-          }
-          names.push(name);
-        }
+    // DOM이 완전히 렌더링될 때까지 대기
+    setTimeout(() => {
+      const startBtn = document.getElementById('start-game-btn');
+      if (startBtn) {
+        // 기존 이벤트 리스너 제거를 위해 클론
+        const newStartBtn = startBtn.cloneNode(true);
+        startBtn.parentNode.replaceChild(newStartBtn, startBtn);
         
-        if (!allFilled) {
-          alert('모든 플레이어의 이름을 입력해주세요.');
-          return;
-        }
-        
-        // 이름 저장
-        this.playerNames = names;
-        
-        // 튜토리얼 화면으로 이동
-        this.gamePhase = 'tutorial';
-        this.render();
-      });
-    }
-    
-    // Enter 키로 다음 입력으로 이동 및 실시간 이름 업데이트
-    for (let i = 0; i < 4; i++) {
-      const input = document.getElementById(`player-name-${i}`);
-      if (input) {
-        // 실시간으로 이름 업데이트
-        input.addEventListener('input', (e) => {
-          this.playerNames[i] = e.target.value.trim();
-        });
-        
-        // 포커스가 벗어날 때도 업데이트
-        input.addEventListener('blur', (e) => {
-          this.playerNames[i] = e.target.value.trim();
-        });
-        
-        input.addEventListener('keypress', (e) => {
-          if (e.key === 'Enter') {
-            if (i < 3) {
-              const nextInput = document.getElementById(`player-name-${i + 1}`);
-              if (nextInput) nextInput.focus();
-            } else {
-              startBtn?.click();
+        newStartBtn.addEventListener('click', () => {
+          // 이름 입력 확인 - 입력 필드에서 직접 값을 읽어옴
+          const names = [];
+          let allFilled = true;
+          
+          for (let i = 0; i < 4; i++) {
+            const input = document.getElementById(`player-name-${i}`);
+            if (!input) {
+              allFilled = false;
+              break;
             }
+            // 입력 필드의 현재 값을 직접 읽어옴 (trim으로 공백 제거)
+            const name = input.value.trim();
+            if (!name || name.length === 0) {
+              allFilled = false;
+              break;
+            }
+            names.push(name);
           }
+          
+          // 모든 이름이 입력되었는지 확인
+          if (!allFilled || names.length !== 4) {
+            alert('모든 플레이어의 이름을 입력해주세요.');
+            return;
+          }
+          
+          // 이름 저장
+          this.playerNames = names;
+          
+          // 튜토리얼 화면으로 이동
+          this.gamePhase = 'tutorial';
+          this.render();
         });
       }
-    }
+      
+      // Enter 키로 다음 입력으로 이동 및 실시간 이름 업데이트
+      for (let i = 0; i < 4; i++) {
+        const input = document.getElementById(`player-name-${i}`);
+        if (input) {
+          // 기존 이벤트 리스너 제거를 위해 클론
+          const newInput = input.cloneNode(true);
+          input.parentNode.replaceChild(newInput, input);
+          
+          // 실시간으로 이름 업데이트
+          newInput.addEventListener('input', (e) => {
+            this.playerNames[i] = e.target.value.trim();
+          });
+          
+          // 포커스가 벗어날 때도 업데이트
+          newInput.addEventListener('blur', (e) => {
+            this.playerNames[i] = e.target.value.trim();
+          });
+          
+          newInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+              if (i < 3) {
+                const nextInput = document.getElementById(`player-name-${i + 1}`);
+                if (nextInput) nextInput.focus();
+              } else {
+                const currentStartBtn = document.getElementById('start-game-btn');
+                if (currentStartBtn) currentStartBtn.click();
+              }
+            }
+          });
+        }
+      }
+    }, 10);
   }
 
   setupTutorialListeners() {
