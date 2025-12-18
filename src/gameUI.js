@@ -355,14 +355,14 @@ export class GameUI {
           <div class="turn-popup-modal" style="pointer-events: ${this.teleportMode ? 'none' : 'auto'};">
             <div class="turn-popup-content" style="pointer-events: auto; ${this.teleportMode ? 'opacity: 0.7; transform: scale(0.9); top: 20px;' : ''}">
               <h2>순간이동</h2>
-              ${!this.teleportMode ? `
+              ${this.teleportMode ? `
+                <p>이동을 원하는 곳을 선택하세요:</p>
+                <p style="font-size: 0.9em; color: #666; margin-top: 10px;">보드에서 원하는 위치를 클릭하세요</p>
+                <button id="cancel-teleport" class="popup-close-btn" style="background: linear-gradient(135deg, #dc3545 0%, #c82333 100%); margin-top: 10px;">취소</button>
+              ` : `
                 <p>순간이동을 사용하시겠습니까?</p>
                 <p style="font-size: 0.9em; color: #666; margin-top: 10px;">확인 버튼을 누른 후 보드에서 원하는 위치를 클릭하세요</p>
                 <button id="confirm-teleport-start" class="popup-close-btn">확인</button>
-                <button id="cancel-teleport" class="popup-close-btn" style="background: linear-gradient(135deg, #dc3545 0%, #c82333 100%); margin-top: 10px;">취소</button>
-              ` : `
-                <p>이동을 원하는 곳을 선택하세요:</p>
-                <p style="font-size: 0.9em; color: #666; margin-top: 10px;">보드에서 원하는 위치를 클릭하세요</p>
                 <button id="cancel-teleport" class="popup-close-btn" style="background: linear-gradient(135deg, #dc3545 0%, #c82333 100%); margin-top: 10px;">취소</button>
               `}
             </div>
@@ -1003,11 +1003,13 @@ export class GameUI {
                 this.setupResourceSelectListeners();
               }, 0);
             } else if (lastCard.effect.teleport) {
+              // 메타버스 카드: 바로 텔레포트 모드로 진입 (추가 팝업 없음)
               this.showTeleportPopup = true;
-              this.teleportMode = false;
+              this.teleportMode = true; // 바로 텔레포트 모드 활성화
               this.render();
               setTimeout(() => {
-                this.setupTeleportListeners();
+                this.setupBoardEventListeners();
+                this.setupTeleportListeners(); // 취소 버튼만 필요
               }, 0);
             } else {
               // 특수 효과가 없으면 턴 종료
