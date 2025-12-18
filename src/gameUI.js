@@ -352,19 +352,13 @@ export class GameUI {
         ` : ''}
         
         ${this.showTeleportPopup && !this.gameState.gameOver ? `
-          <div class="turn-popup-modal" style="pointer-events: ${this.teleportMode ? 'none' : 'auto'};">
-            <div class="turn-popup-content" style="pointer-events: auto; ${this.teleportMode ? 'opacity: 0.7; transform: scale(0.9); top: 20px;' : ''}">
+          <div class="turn-popup-modal">
+            <div class="turn-popup-content">
               <h2>순간이동</h2>
-              ${this.teleportMode ? `
-                <p>이동을 원하는 곳을 선택하세요:</p>
-                <p style="font-size: 0.9em; color: #666; margin-top: 10px;">보드에서 원하는 위치를 클릭하세요</p>
-                <button id="cancel-teleport" class="popup-close-btn" style="background: linear-gradient(135deg, #dc3545 0%, #c82333 100%); margin-top: 10px;">취소</button>
-              ` : `
-                <p>순간이동을 사용하시겠습니까?</p>
-                <p style="font-size: 0.9em; color: #666; margin-top: 10px;">확인 버튼을 누른 후 보드에서 원하는 위치를 클릭하세요</p>
-                <button id="confirm-teleport-start" class="popup-close-btn">확인</button>
-                <button id="cancel-teleport" class="popup-close-btn" style="background: linear-gradient(135deg, #dc3545 0%, #c82333 100%); margin-top: 10px;">취소</button>
-              `}
+              <p>이동을 원하는 곳을 선택하세요:</p>
+              <p style="font-size: 0.9em; color: #666; margin-top: 10px;">확인 버튼을 누른 후 보드에서 원하는 위치를 클릭하세요</p>
+              <button id="confirm-teleport-select" class="popup-close-btn">확인</button>
+              <button id="cancel-teleport" class="popup-close-btn" style="background: linear-gradient(135deg, #dc3545 0%, #c82333 100%); margin-top: 10px;">취소</button>
             </div>
           </div>
         ` : ''}
@@ -495,8 +489,8 @@ export class GameUI {
           hex.classList.add('reachable');
         }
         
-        // 순간이동 모드일 때 모든 타일을 클릭 가능하게 표시
-        if (this.teleportMode && this.showTeleportPopup) {
+        // 순간이동 모드일 때 모든 타일을 클릭 가능하게 표시 (팝업이 닫힌 후)
+        if (this.teleportMode && !this.showTeleportPopup) {
           hex.classList.add('reachable');
           // 순간이동 모드에서는 모든 타일이 클릭 가능하도록 스타일 강제 적용
           hex.style.cursor = 'pointer';
@@ -689,8 +683,8 @@ export class GameUI {
         const x = parseInt(newTile.dataset.x);
         const y = parseInt(newTile.dataset.y);
 
-        // 순간이동 모드일 때 - 모든 타일 클릭 가능
-        if (this.teleportMode && this.showTeleportPopup) {
+        // 순간이동 모드일 때 - 모든 타일 클릭 가능 (팝업이 닫힌 후)
+        if (this.teleportMode && !this.showTeleportPopup) {
           e.stopPropagation();
           e.preventDefault();
           const currentPlayerId = this.gameState.currentPlayer;
@@ -720,7 +714,6 @@ export class GameUI {
             }
             
             // 순간이동 완료 후 턴 종료
-            this.showTeleportPopup = false;
             this.teleportMode = false;
             this.gameState = nextTurn(this.gameState);
             this.render();
@@ -1003,13 +996,12 @@ export class GameUI {
                 this.setupResourceSelectListeners();
               }, 0);
             } else if (lastCard.effect.teleport) {
-              // 메타버스 카드: 바로 텔레포트 모드로 진입 (추가 팝업 없음)
+              // 메타버스 카드: 텔레포트 팝업 표시
               this.showTeleportPopup = true;
-              this.teleportMode = true; // 바로 텔레포트 모드 활성화
+              this.teleportMode = false; // 확인 버튼을 누르면 활성화됨
               this.render();
               setTimeout(() => {
-                this.setupBoardEventListeners();
-                this.setupTeleportListeners(); // 취소 버튼만 필요
+                this.setupTeleportListeners();
               }, 0);
             } else {
               // 특수 효과가 없으면 턴 종료
@@ -1029,15 +1021,16 @@ export class GameUI {
   setupTeleportListeners() {
     // DOM이 완전히 렌더링될 때까지 대기
     setTimeout(() => {
-      // 순간이동 시작 확인 버튼
-      const confirmStartBtn = document.getElementById('confirm-teleport-start');
-      if (confirmStartBtn) {
-        const newConfirmBtn = confirmStartBtn.cloneNode(true);
-        confirmStartBtn.parentNode.replaceChild(newConfirmBtn, confirmStartBtn);
+      // 확인 버튼 (팝업 닫고 보드 클릭 활성화)
+      const confirmBtn = document.getElementById('confirm-teleport-select');
+      if (confirmBtn) {
+        const newConfirmBtn = confirmBtn.cloneNode(true);
+        confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
         
         newConfirmBtn.addEventListener('click', () => {
-          // 순간이동 모드 활성화 (팝업은 유지하되 내용 변경)
-          this.teleportMode = true;
+          // 팝업 닫고 텔레포트 모드 활성화 (보드 클릭 가능하도록)
+          this.showTeleportPopup = false;
+          this.teleportMode = true; // 텔레포트 모드는 유지
           this.render();
           // 보드 이벤트 리스너 다시 설정
           setTimeout(() => {
